@@ -1,70 +1,19 @@
 import Link from "next/link";
+import Image from "next/image";
 import Navbar from "@/components/Navbar";
-import {
-  Home,
-  UtensilsCrossed,
-  Shirt,
-  Sparkles,
-  Heart,
-  Users,
-  Briefcase,
-  Scale,
-  Wifi,
-  MapPin,
-  ChevronRight,
-} from "lucide-react";
 
 const services = [
-  {
-    icon: Home,
-    name: "Accommodations",
-    description: "A place to stay, shelter, vouchers",
-  },
-  {
-    icon: UtensilsCrossed,
-    name: "Food",
-    description: "Something to eat",
-  },
-  {
-    icon: Shirt,
-    name: "Clothing",
-    description: "Something to wear",
-  },
-  {
-    icon: Sparkles,
-    name: "Personal Care",
-    description: "Shower, restroom, laundry",
-  },
-  {
-    icon: Heart,
-    name: "Health",
-    description: "Clinic, mental health, medicine",
-  },
-  {
-    icon: Users,
-    name: "Family Services",
-    description: "Childcare, nursing, check-ups",
-  },
-  {
-    icon: Briefcase,
-    name: "Work",
-    description: "Jobs, applications, training",
-  },
-  {
-    icon: Scale,
-    name: "Legal",
-    description: "Lawyers, court services, immigration",
-  },
-  {
-    icon: Wifi,
-    name: "Connection",
-    description: "Wi-fi, mailbox, computer room",
-  },
-  {
-    icon: MapPin,
-    name: "Services Nearby",
-    description: "Browse services on a map",
-  },
+  { icon: "/icons/accommodations.svg", name: "Accommodations", description: "A place to stay, shelter, vouchers" },
+  { icon: "/icons/food.svg",           name: "Food",           description: "Something to eat" },
+  { icon: "/icons/clothing.svg",       name: "Clothing",       description: "Something to wear" },
+  { icon: "/icons/personal-care.svg",  name: "Personal Care",  description: "Shower, restroom, laundry" },
+  { icon: "/icons/health.svg",         name: "Health",         description: "Clinic, mental health, medicine" },
+  { icon: "/icons/family.svg",         name: "Family Services",description: "Childcare, nursing, check-ups" },
+  { icon: "/icons/work.svg",           name: "Work",           description: "Jobs, applications, training" },
+  { icon: "/icons/legal.svg",          name: "Legal",          description: "Lawyers, court services, immigration" },
+  { icon: "/icons/connection.svg",     name: "Connection",     description: "Wi-fi, mailbox, computer room" },
+  { icon: "/icons/nearby.svg",         name: "Services Nearby",description: "Browse services on a map" },
+  { icon: "/icons/help.svg",           name: "Need Help?",     description: "Use our chat assistant" },
 ];
 
 export default function HomePage() {
@@ -81,63 +30,73 @@ export default function HomePage() {
           Search through hundreds of free support services in NYC that are right
           for you.
         </p>
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:gap-4">
-          <Link
-            href="/auth/signup"
-            className="inline-flex items-center justify-center bg-gray-900 text-white text-sm font-bold px-6 py-3 rounded-xl hover:bg-gray-800 transition"
-          >
-            Get Started
-          </Link>
-          <Link
-            href="/auth/signin"
-            className="inline-flex items-center justify-center border-2 border-gray-900 text-gray-900 text-sm font-bold px-6 py-3 rounded-xl hover:bg-black/5 transition"
-          >
-            Sign In
-          </Link>
-        </div>
       </section>
 
       {/* Service Categories */}
       <section className="bg-white flex-1">
         <ul className="divide-y divide-gray-100">
-          {services.map(({ icon: Icon, name, description }) => (
+          {services.map(({ icon, name, description }) => (
             <li key={name}>
-              <button className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition text-left">
+              <button
+                type="button"
+                className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition text-left"
+              >
                 <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                  <Icon size={20} className="text-gray-700" />
+                  <Image src={icon} alt="" width={22} height={22} aria-hidden />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-900 text-sm">{name}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{description}</p>
                 </div>
-                <ChevronRight size={18} className="text-gray-400 flex-shrink-0" />
+                <Image src="/icons/arrow-right.svg" alt="" width={18} height={18} className="text-gray-400 flex-shrink-0" aria-hidden />
               </button>
             </li>
           ))}
         </ul>
       </section>
 
-      {/* Testimonial */}
-      <section className="bg-brand-dark px-5 py-12 text-white">
-        <p className="text-xl font-black leading-snug max-w-xs">
-          &ldquo;You&rsquo;re not alone in this journey&rdquo;
-        </p>
-        <p className="mt-4 text-sm text-gray-300 max-w-sm leading-relaxed">
+      {/* "You're not alone" — yellow background, matches wireframe */}
+      <section className="bg-brand-yellow px-5 pt-12 pb-10">
+        <h2 className="text-2xl font-black text-gray-900 leading-snug max-w-xs">
+          You&rsquo;re not alone in this journey
+        </h2>
+        <p className="mt-4 text-sm text-gray-800 max-w-sm leading-relaxed">
           People can experience homelessness for many reasons. Our peer
           navigators share lived experience with the system and help you prepare
           for the future.
         </p>
-        <div className="mt-6 border-t border-gray-600 pt-6">
-          <blockquote className="text-sm text-gray-200 italic leading-relaxed">
-            &ldquo;StreetLives was the most easy to understand and helped me find
-            what I needed.&rdquo;
-          </blockquote>
-          <p className="mt-2 text-xs text-gray-400">— Jorge C.</p>
-        </div>
+        {/* Peer illustration placeholder — honeycomb of faces */}
+        {/* <div className="my-8 flex justify-center">
+          <div className="grid grid-cols-3 gap-3 max-w-[180px]">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div
+                key={i}
+                className="w-14 h-14 rounded-full bg-white/60 border-2 border-white flex items-center justify-center text-xl"
+              >
+              </div>
+            ))}
+          </div>
+        </div> */}
+        <button
+          type="button"
+          className="bg-gray-900 text-white text-sm font-bold px-6 py-3 my-5 rounded-xl hover:bg-gray-800 transition"
+        >
+          Learn From Peers
+        </button>
+      </section>
+
+      {/* Testimonial quote */}
+      <section className="bg-gray-900 px-5 py-10">
+        <p className="text-4xl font-black text-brand-yellow leading-none mb-4">&ldquo;</p>
+        <blockquote className="text-white text-base font-semibold leading-relaxed max-w-sm">
+          YourPeer NYC is the best. The info was useful, easy to understand and
+          helped me find what I needed.
+        </blockquote>
+        <p className="mt-4 text-xs text-gray-400">— Jorge C.</p>
       </section>
 
       {/* Provider CTA */}
-      <section className="bg-gray-900 px-5 py-10 text-center">
+      <section className="bg-brand-dark px-5 py-10 text-center">
         <p className="text-white font-bold text-lg">
           Are you a service provider?
         </p>
@@ -163,6 +122,15 @@ export default function HomePage() {
         </div>
         <p className="mt-4 text-xs text-gray-400">© StreetLives.org</p>
       </footer>
+
+      {/* Chat FAB */}
+      <Link
+        href="/chat"
+        className="fixed bottom-6 right-5 w-14 h-14 bg-brand-yellow rounded-full shadow-lg flex items-center justify-center hover:brightness-95 transition z-50"
+        aria-label="Chat with a peer navigator"
+      >
+        <Image src="/icons/chat.svg" alt="" width={24} height={24} aria-hidden />
+      </Link>
     </div>
   );
 }

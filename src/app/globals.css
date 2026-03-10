@@ -2,12 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-
-html {
-  font-family: 'Inter', system-ui, sans-serif;
-}
-
 body {
   @apply bg-gray-50 text-gray-900;
 }
+
+.typing-dot-1 { animation-delay: 0ms; }
+.typing-dot-2 { animation-delay: 150ms; }
+.typing-dot-3 { animation-delay: 300ms; }

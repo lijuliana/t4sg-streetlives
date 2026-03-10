@@ -31,17 +31,10 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Redirect unauthenticated users away from protected routes
-  if (!user && (pathname.startsWith("/feed") || pathname.startsWith("/post"))) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/auth/signin";
-    return NextResponse.redirect(url);
-  }
-
   // Redirect authenticated users away from auth pages
   if (user && pathname.startsWith("/auth")) {
     const url = request.nextUrl.clone();
-    url.pathname = "/feed";
+    url.pathname = "/";
     return NextResponse.redirect(url);
   }
 
