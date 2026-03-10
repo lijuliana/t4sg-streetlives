@@ -1,0 +1,14 @@
+# Next.js build output
+.next/
+out/
+
+# dependencies
+node_modules/
+
+# env
+.env*
+!.env.example
+
+# logs
+*.log
+node_modules
