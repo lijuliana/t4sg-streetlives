@@ -208,7 +208,7 @@ export default function ChatPage() {
 
       if (msg.role === "user") {
         return (
-          <div key={msg.id} className="flex justify-end mb-2">
+          <div key={msg.id} className="flex justify-end mb-3">
             <div className="bg-brand-yellow text-gray-900 text-sm font-medium px-4 py-2.5 rounded-2xl rounded-br-sm max-w-[75%]">
               {msg.content}
             </div>
@@ -221,7 +221,7 @@ export default function ChatPage() {
       const showAvatar = !prevMsg || prevMsg.role !== msg.role || (prevMsg.role as string) === "system";
 
       return (
-        <div key={msg.id} className={cn("flex gap-3 mb-2", !showAvatar && "pl-13")}>
+        <div key={msg.id} className={cn("flex gap-3 mb-3", !showAvatar && "pl-13")}>
           {showAvatar ? (
             msg.role === "navigator" ? <NavigatorAvatar /> : <BotAvatar />
           ) : (
@@ -262,7 +262,7 @@ export default function ChatPage() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-0.5">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
         {renderMessages()}
 
         {/* Typing indicator */}
