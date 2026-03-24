@@ -17,3 +17,5 @@ node_modules/
 
 # TypeScript build info
 *.tsbuildinfo
+
+function.zip
