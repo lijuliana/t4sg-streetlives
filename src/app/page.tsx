@@ -126,7 +126,7 @@ export default function HomePage() {
       {/* Chat FAB */}
       <Link
         href="/chat"
-        className="fixed bottom-6 right-5 w-14 h-14 bg-brand-yellow rounded-full shadow-lg flex items-center justify-center hover:brightness-95 transition z-50"
+        className="fixed bottom-20 right-5 w-14 h-14 bg-brand-yellow rounded-full shadow-lg flex items-center justify-center hover:brightness-95 transition z-50"
         aria-label="Chat with a peer navigator"
       >
         <Image src="/icons/chat.svg" alt="" width={24} height={24} aria-hidden />

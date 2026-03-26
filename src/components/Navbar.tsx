@@ -1,14 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { Menu } from "lucide-react";
+import { LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useStore } from "@/lib/store";
+
+const ROLE_DASHBOARD: Record<string, string> = {
+  user: "/dashboard/user",
+  navigator: "/dashboard/navigator",
+  supervisor: "/dashboard/supervisor",
+};
 
 interface NavbarProps {
   className?: string;
 }
 
 export default function Navbar({ className }: NavbarProps) {
+  const activeRole = useStore((s) => s.activeRole);
+
   return (
     <header
       className={cn(
@@ -16,13 +25,14 @@ export default function Navbar({ className }: NavbarProps) {
         className
       )}
     >
-      {/* Hamburger */}
-      <button
-        aria-label="Open menu"
+      {/* Dashboard link */}
+      <Link
+        href={ROLE_DASHBOARD[activeRole]}
         className="p-1 text-gray-800 hover:opacity-70 transition-opacity"
+        aria-label="Go to dashboard"
       >
-        <Menu size={24} strokeWidth={2} />
-      </button>
+        <LayoutDashboard size={22} strokeWidth={2} />
+      </Link>
 
       {/* Wordmark */}
       <Link href="/" className="text-lg font-bold tracking-tight text-gray-900">
