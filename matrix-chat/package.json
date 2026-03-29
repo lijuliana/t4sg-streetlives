@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:backend": "npm run dev --prefix backend",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "provision-guest": "node scripts/provision-guest.mjs"
   },
   "dependencies": {
     "matrix-js-sdk": "^41.1.0-rc.0",

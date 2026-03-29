@@ -1,185 +1,231 @@
 import React, { useEffect, useRef, useState } from "react";
-import { BASE_URL, ACCESS_TOKEN } from "../lib/matrixClient";
+import {
+  RoomEvent,
+  EventType,
+  MsgType,
+  MatrixEventEvent,
+  HttpApiEvent,
+} from "matrix-js-sdk";
+import type { MatrixEvent, Room, IRoomTimelineData } from "matrix-js-sdk";
+import {
+  getMatrixClient,
+  NAVIGATOR_USER_ID,
+  MatrixAuthError,
+} from "../lib/matrixClient";
 import ChatMessage from "../components/ChatMessage";
 import type { Message } from "../components/ChatMessage";
 import ChatInput from "../components/ChatInput";
 
-// ─── Env vars ────────────────────────────────────────────────────────────────
-const ROOM_ID = import.meta.env.VITE_MATRIX_ROOM_ID as string;
-const MY_USER_ID = import.meta.env.VITE_MATRIX_USER_ID as string;
-const NAVIGATOR_USER_ID = import.meta.env
-  .VITE_MATRIX_NAVIGATOR_USER_ID as string;
-// ─────────────────────────────────────────────────────────────────────────────
+type UISyncState = "idle" | "syncing" | "ready" | "error" | "auth-error";
 
-type SyncState = "idle" | "syncing" | "ready" | "error";
+interface NavigatorChatPageProps {
+  /** The Matrix room ID for this user's chat session. Provided by App.tsx. */
+  roomId: string;
+  /** Called when a session-expiry / auth error is detected mid-session. */
+  onAuthError?: () => void;
+}
 
-type RawEvent = {
-  event_id: string;
-  sender: string;
-  type: string;
-  content: { msgtype?: string; body?: string };
-  origin_server_ts: number;
-};
-
-function toMessage(ev: RawEvent): Message {
+// ── Convert a MatrixEvent to our local Message shape ─────────────────────────
+// After the SDK decrypts an m.room.encrypted event, getType() returns the
+// real decrypted type (e.g. m.room.message) and getContent() returns the
+// plaintext — so this works identically for plain and encrypted rooms.
+function matrixEventToMessage(ev: MatrixEvent): Message | null {
+  const id = ev.getId();
+  const sender = ev.getSender();
+  const content = ev.getContent();
+  if (
+    ev.getType() !== EventType.RoomMessage ||
+    content["msgtype"] !== MsgType.Text ||
+    !id ||
+    !sender
+  ) {
+    return null;
+  }
   return {
-    eventId: ev.event_id,
-    sender: ev.sender,
-    body: ev.content.body ?? "",
-    timestamp: ev.origin_server_ts,
+    eventId: id,
+    sender,
+    body: (content["body"] as string) ?? "",
+    timestamp: ev.getTs(),
   };
 }
 
-const ENV_ERROR =
-  !import.meta.env.VITE_MATRIX_BASE_URL ||
-  !import.meta.env.VITE_MATRIX_ACCESS_TOKEN ||
-  !import.meta.env.VITE_MATRIX_USER_ID ||
-  !ROOM_ID
-    ? "Missing environment variables. Please fill in your .env.local file."
-    : null;
-
-const NavigatorChatPage: React.FC = () => {
-  const [syncState, setSyncState] = useState<SyncState>(
-    ENV_ERROR ? "error" : "syncing"
-  );
+const NavigatorChatPage: React.FC<NavigatorChatPageProps> = ({
+  roomId,
+  onAuthError,
+}) => {
+  const [uiState, setUiState] = useState<UISyncState>("syncing");
   const [messages, setMessages] = useState<Message[]>([]);
-  const [errorMsg, setErrorMsg] = useState<string | null>(ENV_ERROR);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [myUserId, setMyUserId] = useState<string>("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (ENV_ERROR) return;
 
-    let stopped = false;
-    const controller = new AbortController();
-    const headers = { Authorization: `Bearer ${ACCESS_TOKEN}` };
+    let mounted = true;
+    let removeListeners: (() => void) | undefined;
 
-    const run = async () => {
-      // ── Step 1: get a sync token so we don't miss live messages during load ──
-      let since: string;
-      try {
-        const res = await fetch(`${BASE_URL}/_matrix/client/v3/sync?timeout=0`, {
-          headers,
-          signal: controller.signal,
-        });
-        const data = (await res.json()) as { next_batch: string };
-        since = data.next_batch;
-      } catch {
-        if (!stopped) {
-          setErrorMsg("Failed to connect to Matrix.");
-          setSyncState("error");
-        }
-        return;
-      }
-
-      // ── Step 2: load initial messages from /messages ──────────────────────
-      try {
-        const encodedRoom = encodeURIComponent(ROOM_ID);
-        const res = await fetch(
-          `${BASE_URL}/_matrix/client/v3/rooms/${encodedRoom}/messages?dir=b&limit=50`,
-          { headers, signal: controller.signal }
-        );
-        const data = (await res.json()) as { chunk: RawEvent[] };
-        const msgs = data.chunk
-          .filter(
-            (ev) =>
-              ev.type === "m.room.message" && ev.content.msgtype === "m.text"
-          )
-          .reverse()
-          .map(toMessage);
-        if (!stopped) {
-          setMessages(msgs);
-          setSyncState("ready");
-        }
-      } catch {
-        if (!stopped) {
-          setErrorMsg("Failed to load messages.");
-          setSyncState("error");
-        }
-        return;
-      }
-
-      // ── Step 3: long-poll sync loop for live updates ──────────────────────
-      while (!stopped) {
-        try {
-          const res = await fetch(
-            `${BASE_URL}/_matrix/client/v3/sync?timeout=30000&since=${since}`,
-            { headers, signal: controller.signal }
-          );
-          const data = (await res.json()) as {
-            next_batch: string;
-            rooms?: {
-              join?: Record<string, { timeline?: { events: RawEvent[] } }>;
-            };
-          };
-          since = data.next_batch;
-
-          const roomEvents =
-            data.rooms?.join?.[ROOM_ID]?.timeline?.events ?? [];
-          const newMsgs = roomEvents
-            .filter(
-              (ev) =>
-                ev.type === "m.room.message" && ev.content.msgtype === "m.text"
-            )
-            .map(toMessage);
-
-          if (newMsgs.length > 0 && !stopped) {
-            setMessages((prev) => {
-              const ids = new Set(prev.map((m) => m.eventId));
-              const fresh = newMsgs.filter((m) => !ids.has(m.eventId));
-              return fresh.length > 0 ? [...prev, ...fresh] : prev;
-            });
-          }
-        } catch {
-          break;
-        }
-      }
+    // Helper used by both the initial load and the live listener to append a
+    // message without duplicating an event that's already in state.
+    const addMessage = (msg: Message) => {
+      setMessages((prev) => {
+        const ids = new Set(prev.map((m) => m.eventId));
+        if (ids.has(msg.eventId)) return prev;
+        return [...prev, msg];
+      });
     };
 
-    run();
+    // Attach a late-decryption listener to a single encrypted MatrixEvent.
+    // When Element sends a message, it ships the Megolm session key to our
+    // device via a to-device message in the next /sync response. The SDK
+    // decrypts the event and fires MatrixEventEvent.Decrypted — at that point
+    // getType() and getContent() return the decrypted values.
+    const watchDecryption = (ev: MatrixEvent) => {
+      ev.once(MatrixEventEvent.Decrypted, () => {
+        if (!mounted) return;
+        const msg = matrixEventToMessage(ev);
+        if (msg) addMessage(msg);
+      });
+    };
+
+    const handleAuthFailure = () => {
+      if (!mounted) return;
+      setUiState("auth-error");
+      onAuthError?.();
+    };
+
+    getMatrixClient()
+      .then(async (client) => {
+        if (!mounted) return;
+
+        // Capture the authenticated user's ID for isOwn() checks.
+        setMyUserId(client.getUserId() ?? "");
+
+        const crypto = client.getCrypto();
+
+        // ── Load initial messages from the live timeline ──────────────────
+        // The timeline is populated by the initial sync that already ran
+        // inside getMatrixClient(). Events the SDK could decrypt appear as
+        // m.room.message; events with missing keys are still m.room.encrypted
+        // and get a late-decryption watcher attached below.
+        const room = client.getRoom(roomId);
+        console.log("[NavigatorChat] Room found:", !!room, "| Room ID:", roomId);
+
+        if (room) {
+          const allEvents = room.getLiveTimeline().getEvents();
+          let plain = 0,
+            encrypted = 0;
+          for (const ev of allEvents) {
+            const msg = matrixEventToMessage(ev);
+            if (msg) {
+              plain++;
+              setMessages((prev) => [...prev, msg]);
+            } else if (ev.getType() === "m.room.encrypted") {
+              encrypted++;
+              watchDecryption(ev);
+            }
+          }
+          console.log(
+            `[NavigatorChat] Initial events: ${plain} plain, ${encrypted} still-encrypted`,
+          );
+
+          // prepareToEncrypt pre-fetches device keys for all room members and
+          // creates the outbound Megolm session. The SDK docs mark this as
+          // required before the first sendTextMessage() in an encrypted room.
+          crypto?.prepareToEncrypt(room);
+        }
+        setUiState("ready");
+
+        // ── Live-message listener ─────────────────────────────────────────
+        // RoomEvent.Timeline fires for every event appended to the live
+        // timeline. The SDK decrypts m.room.encrypted events synchronously
+        // when the Megolm session key is already cached; otherwise the event
+        // stays encrypted until the key arrives and we attach a watcher.
+        const onTimeline = (
+          event: MatrixEvent,
+          room: Room | undefined,
+          _toStartOfTimeline: boolean | undefined,
+          _removed: boolean,
+          data: IRoomTimelineData,
+        ) => {
+          if (
+            !mounted ||
+            !room ||
+            room.roomId !== roomId ||
+            !data.liveEvent
+          )
+            return;
+          const msg = matrixEventToMessage(event);
+          if (msg) {
+            addMessage(msg);
+          } else if (event.getType() === "m.room.encrypted") {
+            watchDecryption(event);
+          }
+        };
+
+        // ── Mid-session auth failure listener ─────────────────────────────
+        // The SDK fires HttpApiEvent.SessionLoggedOut when the server returns
+        // M_UNKNOWN_TOKEN (token revoked or expired after a successful init).
+        const onSessionLoggedOut = () => handleAuthFailure();
+
+        client.on(RoomEvent.Timeline, onTimeline);
+        client.on(HttpApiEvent.SessionLoggedOut, onSessionLoggedOut);
+
+        removeListeners = () => {
+          client.off(RoomEvent.Timeline, onTimeline);
+          client.off(HttpApiEvent.SessionLoggedOut, onSessionLoggedOut);
+        };
+      })
+      .catch((err: unknown) => {
+        if (!mounted) return;
+        if (err instanceof MatrixAuthError) {
+          handleAuthFailure();
+          return;
+        }
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[NavigatorChat] Initialization error:", err);
+        setErrorMsg(msg);
+        setUiState("error");
+      });
 
     return () => {
-      stopped = true;
-      controller.abort();
+      mounted = false;
+      removeListeners?.();
+      // Do NOT call client.stopClient() — the singleton must remain running
+      // across React StrictMode's unmount/remount cycles.
     };
-  }, []);
+  }, [roomId, onAuthError]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // ── Send message ─────────────────────────────────────────────────────────────
+  // ── Send message ──────────────────────────────────────────────────────────
   const handleSend = async (text: string) => {
     setSendError(null);
-    const txnId = Date.now().toString();
     try {
-      const encodedRoom = encodeURIComponent(ROOM_ID);
-      const res = await fetch(
-        `${BASE_URL}/_matrix/client/v3/rooms/${encodedRoom}/send/m.room.message/${txnId}`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${ACCESS_TOKEN}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ msgtype: "m.text", body: text }),
-        }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const client = await getMatrixClient();
+      // sendTextMessage encrypts automatically when the room has encryption
+      // enabled — the SDK handles Megolm session key sharing transparently.
+      await client.sendTextMessage(roomId, text);
     } catch (err) {
+      if (err instanceof MatrixAuthError) {
+        setUiState("auth-error");
+        onAuthError?.();
+        return;
+      }
       setSendError("Failed to send message. Please try again.");
       console.error("[NavigatorChat] Send error:", err);
     }
   };
 
-  // ── Render helpers ────────────────────────────────────────────────────────────
+  // ── Render helpers ────────────────────────────────────────────────────────
   const isNavigator = (sender: string) =>
     NAVIGATOR_USER_ID ? sender === NAVIGATOR_USER_ID : false;
+  const isOwn = (sender: string) => !!myUserId && sender === myUserId;
 
-  const isOwn = (sender: string) => sender === MY_USER_ID;
-
-  // ── UI ────────────────────────────────────────────────────────────────────────
+  // ── UI ────────────────────────────────────────────────────────────────────
   return (
     <>
       {/* Google Fonts */}
@@ -253,7 +299,7 @@ const NavigatorChatPage: React.FC = () => {
             </h1>
           </div>
           <div style={{ marginLeft: "auto" }}>
-            <StatusBadge state={syncState} />
+            <StatusBadge state={uiState} />
           </div>
         </div>
 
@@ -269,7 +315,7 @@ const NavigatorChatPage: React.FC = () => {
           }}
         >
           {/* Loading */}
-          {syncState === "syncing" && (
+          {uiState === "syncing" && (
             <CenteredNotice>
               <Spinner />
               <span style={{ marginLeft: "10px", color: "#64748b" }}>
@@ -278,8 +324,49 @@ const NavigatorChatPage: React.FC = () => {
             </CenteredNotice>
           )}
 
-          {/* Error */}
-          {syncState === "error" && errorMsg && (
+          {/* Auth error */}
+          {uiState === "auth-error" && (
+            <CenteredNotice>
+              <div
+                style={{
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  borderRadius: "10px",
+                  padding: "20px 24px",
+                  color: "#b91c1c",
+                  fontSize: "14px",
+                  textAlign: "center",
+                  maxWidth: "360px",
+                }}
+              >
+                <p style={{ fontWeight: 600, marginBottom: "8px" }}>
+                  Session expired
+                </p>
+                <p style={{ color: "#dc2626", marginBottom: "16px" }}>
+                  Your login session is no longer valid. Please sign in again.
+                </p>
+                <button
+                  onClick={() => onAuthError?.()}
+                  style={{
+                    padding: "8px 20px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: "#f5c800",
+                    color: "#111",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    fontFamily: "'DM Sans', sans-serif",
+                  }}
+                >
+                  Sign in again
+                </button>
+              </div>
+            </CenteredNotice>
+          )}
+
+          {/* Generic error */}
+          {uiState === "error" && errorMsg && (
             <div
               style={{
                 background: "#fef2f2",
@@ -295,7 +382,7 @@ const NavigatorChatPage: React.FC = () => {
           )}
 
           {/* Empty state */}
-          {syncState === "ready" && messages.length === 0 && (
+          {uiState === "ready" && messages.length === 0 && (
             <CenteredNotice>
               <span style={{ color: "#94a3b8", fontSize: "14px" }}>
                 No messages yet. Be the first to say something!
@@ -332,7 +419,7 @@ const NavigatorChatPage: React.FC = () => {
         )}
 
         {/* ── Input ── */}
-        <ChatInput onSend={handleSend} disabled={syncState !== "ready"} />
+        <ChatInput onSend={handleSend} disabled={uiState !== "ready"} />
       </div>
     </>
   );
@@ -340,13 +427,18 @@ const NavigatorChatPage: React.FC = () => {
 
 // ── Small helper components ───────────────────────────────────────────────────
 
-const StatusBadge: React.FC<{ state: SyncState }> = ({ state }) => {
-  const map: Record<SyncState, { label: string; color: string; bg: string }> =
+const StatusBadge: React.FC<{ state: UISyncState }> = ({ state }) => {
+  const map: Record<UISyncState, { label: string; color: string; bg: string }> =
     {
       idle: { label: "Idle", color: "#9ca3af", bg: "#374151" },
       syncing: { label: "Connecting…", color: "#111", bg: "#f5c800" },
       ready: { label: "Connected", color: "#111", bg: "#f5c800" },
       error: { label: "Error", color: "#fca5a5", bg: "#7f1d1d" },
+      "auth-error": {
+        label: "Session Expired",
+        color: "#fca5a5",
+        bg: "#7f1d1d",
+      },
     };
   const { label, color, bg } = map[state];
   return (
