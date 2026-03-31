@@ -75,7 +75,7 @@ function NavigatorAvatar() {
   );
 }
 
-export default function ChatPage() {
+export function ChatContent() {
   const router = useRouter();
 
   const createSession = useStore((s) => s.createSession);
@@ -293,7 +293,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-100 w-full">
+    <div className="flex flex-col h-full bg-gray-100 w-full">
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
         <div className="w-8" />
@@ -371,16 +371,14 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* LIVE FAB */}
-      {(chatState === "greeting" || chatState === "user_replied") && (
-        <button type="button" onClick={handleLiveFAB} className="fixed bottom-20 right-5 w-16 h-16 bg-brand-yellow rounded-full shadow-lg flex flex-col items-center justify-center gap-0.5 hover:brightness-95 transition z-50" aria-label="Connect with a live peer navigator">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 18v-1a5 5 0 0 1 5-5h8a5 5 0 0 1 5 5v1" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-          <span className="text-[9px] font-medium text-gray-900 tracking-widest">LIVE</span>
-        </button>
-      )}
+    </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <div className="h-screen w-full">
+      <ChatContent />
     </div>
   );
 }

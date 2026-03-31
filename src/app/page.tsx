@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import Navbar from "@/components/Navbar";
 import TestimonialCarousel from "@/components/TestimonialCarousel";
+import ChatFAB from "@/components/ChatFAB";
 
 const services = [
   { icon: "/new-icons/house.svg",       name: "Accommodations",  description: "A place to stay, shelter, vouchers" },
@@ -128,14 +129,7 @@ export default function HomePage() {
         <p className="mt-4 text-xs text-gray-400">© StreetLives.org</p>
       </footer>
 
-      {/* Chat FAB */}
-      <Link
-        href="/chat"
-        className="fixed bottom-20 right-5 w-14 h-14 bg-brand-yellow rounded-full shadow-lg flex items-center justify-center hover:brightness-95 transition z-50"
-        aria-label="Chat with a peer navigator"
-      >
-        <Image src="/new-icons/chat-search.svg" alt="" width={24} height={24} aria-hidden />
-      </Link>
+      <ChatFAB />
     </div>
   );
 }
