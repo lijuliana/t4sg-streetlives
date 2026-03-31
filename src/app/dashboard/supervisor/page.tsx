@@ -123,15 +123,15 @@ export default function SupervisorDashboardPage() {
       {/* Metrics grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-white border border-gray-200 rounded-xl px-4 py-4 text-center">
-          <p className="text-3xl font-semibold text-gray-900">{totalSessions}</p>
+          <p className="text-3xl font-normal text-gray-900">{totalSessions}</p>
           <p className="text-xs text-gray-500 mt-1">Total Sessions</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl px-4 py-4 text-center">
-          <p className="text-3xl font-semibold text-green-700">{activeNow}</p>
+          <p className="text-3xl font-normal text-green-700">{activeNow}</p>
           <p className="text-xs text-gray-500 mt-1">Active</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl px-4 py-4 text-center">
-          <p className={`text-3xl font-semibold ${newRequests > 0 ? "text-amber-600" : "text-gray-900"}`}>
+          <p className={`text-3xl font-normal ${newRequests > 0 ? "text-amber-600" : "text-gray-900"}`}>
             {newRequests}
           </p>
           <p className={`text-xs mt-1 font-medium ${newRequests > 0 ? "text-amber-600" : "text-gray-500"}`}>
@@ -139,14 +139,14 @@ export default function SupervisorDashboardPage() {
           </p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl px-4 py-4 text-center">
-          <p className="text-3xl font-semibold text-blue-600">{totalReferrals}</p>
+          <p className="text-3xl font-normal text-blue-600">{totalReferrals}</p>
           <p className="text-xs text-gray-500 mt-1">Total Referrals</p>
         </div>
       </div>
 
       {/* Per-navigator breakdown */}
       <section>
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">
           By Navigator
         </h2>
         <div className="space-y-2">

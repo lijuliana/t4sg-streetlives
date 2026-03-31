@@ -56,7 +56,7 @@ export default function UserSessionDetailPage() {
       {/* Summary */}
       {session.summary && (
         <div>
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-2">
             Session Summary
           </h2>
           <div className="bg-white border border-gray-200 rounded-xl px-5 py-4">
@@ -67,7 +67,7 @@ export default function UserSessionDetailPage() {
 
       {/* Referrals */}
       <div>
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-2">
           Referrals ({session.referrals.length})
         </h2>
         {session.referrals.length === 0 ? (

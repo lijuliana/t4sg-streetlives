@@ -61,7 +61,7 @@ export default function ReferralForm({ sessionId, open, onClose }: Props) {
         <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50" />
         <Dialog.Content className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl shadow-xl p-6 focus:outline-none">
           <div className="flex items-center justify-between mb-5">
-            <Dialog.Title className="text-base font-semibold text-gray-900">
+            <Dialog.Title className="text-base font-normal text-gray-900">
               Add Referral
             </Dialog.Title>
             <Dialog.Close asChild>

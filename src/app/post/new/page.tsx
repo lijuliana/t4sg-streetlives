@@ -15,7 +15,7 @@ export default function NewPostPage() {
           <ArrowLeft size={20} className="text-gray-900" />
         </Link>
         <div>
-          <h1 className="text-2xl font-black text-gray-900">New Post</h1>
+          <h1 className="text-2xl font-medium text-gray-900">New Post</h1>
           <p className="text-sm text-gray-700 mt-0.5">
             Share with the community
           </p>

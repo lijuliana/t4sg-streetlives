@@ -1,14 +1,8 @@
 import Link from "next/link";
-import { LayoutDashboard } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { auth0 } from "@/lib/auth0";
-
-const ROLES_CLAIM = "https://streetlives.app/roles";
-
-const ROLE_DASHBOARD: Record<string, string> = {
-  navigator: "/navigator/dashboard",
-  supervisor: "/supervisor/dashboard",
-};
+import NavMenu from "@/components/NavMenu";
 
 interface NavbarProps {
   className?: string;
@@ -17,37 +11,38 @@ interface NavbarProps {
 export default async function Navbar({ className }: NavbarProps) {
   const session = await auth0.getSession();
 
-  const roles = (session?.user?.[ROLES_CLAIM] as string[]) ?? [];
-  const activeRole = roles.find((r) => r in ROLE_DASHBOARD);
-  const dashboardHref = activeRole ? ROLE_DASHBOARD[activeRole] : "/";
-
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200",
+        "sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-brand-yellow",
         className
       )}
     >
-      {/* Dashboard link */}
-      <Link
-        href={dashboardHref}
-        className="p-1 text-gray-800 hover:opacity-70 transition-opacity"
-        aria-label="Go to dashboard"
-      >
-        <LayoutDashboard size={22} strokeWidth={2} />
+      {/* Left: hamburger menu + language selector */}
+      <div className="flex items-center gap-3">
+        <NavMenu />
+        <button
+          type="button"
+          className="flex items-center gap-1 text-sm text-brand-dark hover:opacity-70 transition-opacity"
+          aria-label="Select language"
+        >
+          <ChevronDown size={14} strokeWidth={2} />
+          English
+        </button>
+      </div>
+
+      {/* Center: wordmark */}
+      <Link href="/" className="text-base tracking-tight text-brand-dark absolute left-1/2 -translate-x-1/2">
+        <span className="font-bold">YourPeer</span>{" "}
+        <span className="font-normal">NYC</span>
       </Link>
 
-      {/* Wordmark */}
-      <Link href="/" className="text-lg font-bold tracking-tight text-gray-900">
-        <span className="font-black">StreetLives</span>
-      </Link>
-
-      {/* Right group */}
+      {/* Right: auth links + Quick Exit */}
       <div className="flex items-center gap-3">
         {session ? (
           <a
             href="/auth/logout"
-            className="text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
+            className="text-sm text-gray-600 hover:text-brand-dark transition-colors"
           >
             Log out
           </a>
@@ -55,13 +50,13 @@ export default async function Navbar({ className }: NavbarProps) {
           <>
             <a
               href="/auth/signin"
-              className="text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
+              className="text-sm text-gray-600 hover:opacity-70 transition-opacity hidden sm:inline"
             >
               Sign In
             </a>
             <a
               href="/auth/signup"
-              className="text-sm font-semibold text-gray-900 bg-brand-yellow px-3 py-1.5 rounded-full hover:brightness-95 transition"
+              className="text-sm text-brand-dark bg-brand-yellow px-3 py-1.5 rounded-lg hover:brightness-95 transition hidden sm:inline"
             >
               Sign Up
             </a>
@@ -69,11 +64,11 @@ export default async function Navbar({ className }: NavbarProps) {
         )}
         <a
           href="https://www.google.com"
-          className="flex items-center gap-1.5 bg-brand-exit text-white text-xs font-bold uppercase tracking-wide px-3 py-1.5 rounded-full hover:opacity-90 transition-opacity"
+          className="flex items-center gap-1.5 text-brand-exit text-xs font-medium uppercase tracking-wide hover:opacity-90 transition-opacity"
           aria-label="Quick exit — leave this site"
         >
           Quick Exit
-          <span className="w-4 h-4 rounded-full bg-white text-brand-exit flex items-center justify-center text-xs font-black leading-none">
+          <span className="w-5 h-5 rounded-full bg-brand-exit text-white flex items-center justify-center text-xs font-medium leading-none">
             !
           </span>
         </a>

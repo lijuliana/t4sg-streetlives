@@ -1,19 +1,20 @@
 import Link from "next/link";
 import Image from "next/image";
 import Navbar from "@/components/Navbar";
+import TestimonialCarousel from "@/components/TestimonialCarousel";
 
 const services = [
-  { icon: "/icons/accommodations.svg", name: "Accommodations", description: "A place to stay, shelter, vouchers" },
-  { icon: "/icons/food.svg",           name: "Food",           description: "Something to eat" },
-  { icon: "/icons/clothing.svg",       name: "Clothing",       description: "Something to wear" },
-  { icon: "/icons/personal-care.svg",  name: "Personal Care",  description: "Shower, restroom, laundry" },
-  { icon: "/icons/health.svg",         name: "Health",         description: "Clinic, mental health, medicine" },
-  { icon: "/icons/family.svg",         name: "Family Services",description: "Childcare, nursing, check-ups" },
-  { icon: "/icons/work.svg",           name: "Work",           description: "Jobs, applications, training" },
-  { icon: "/icons/legal.svg",          name: "Legal",          description: "Lawyers, court services, immigration" },
-  { icon: "/icons/connection.svg",     name: "Connection",     description: "Wi-fi, mailbox, computer room" },
-  { icon: "/icons/nearby.svg",         name: "Services Nearby",description: "Browse services on a map" },
-  { icon: "/icons/help.svg",           name: "Need Help?",     description: "Use our chat assistant" },
+  { icon: "/new-icons/house.svg",       name: "Accommodations",  description: "A place to stay, shelter, vouchers" },
+  { icon: "/new-icons/store.svg",       name: "Food",            description: "Something to eat" },
+  { icon: "/new-icons/bag.svg",         name: "Clothing",        description: "Something to wear" },
+  { icon: "/new-icons/umbrella.svg",    name: "Personal Care",   description: "Shower, restroom, laundry" },
+  { icon: "/new-icons/heart-chart.svg", name: "Health",          description: "Clinic, mental health, medicine" },
+  { icon: "/new-icons/person.svg",      name: "Family Services", description: "Childcare, nursing, check-ups" },
+  { icon: "/new-icons/checklist.svg",   name: "Work",            description: "Jobs, applications, training" },
+  { icon: "/new-icons/scales.svg",      name: "Legal",           description: "Lawyers, court services, immigration" },
+  { icon: "/new-icons/wifi.svg",        name: "Connection",      description: "Wi-fi, mailbox, computer room" },
+  { icon: "/new-icons/cursor.svg",      name: "Services Nearby", description: "Browse services on a map" },
+  { icon: "/new-icons/chat.svg",        name: "Need Help?",      description: "Use our chat assistant" },
 ];
 
 export default function HomePage() {
@@ -23,13 +24,19 @@ export default function HomePage() {
 
       {/* Hero */}
       <section className="bg-brand-yellow px-5 pt-10 pb-12">
-        <h1 className="text-3xl font-black leading-tight text-gray-900 max-w-xs">
+        <h1 className="text-3xl font-medium leading-tight text-brand-dark max-w-xs">
           Peer-validated services for youth and young adults
         </h1>
-        <p className="mt-3 text-sm text-gray-800 max-w-xs">
+        <p className="mt-3 text-sm text-brand-dark/80 max-w-xs">
           Search through hundreds of free support services in NYC that are right
           for you.
         </p>
+        <button
+          type="button"
+          className="mt-6 bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-lg hover:opacity-90 transition"
+        >
+          Get started below
+        </button>
       </section>
 
       {/* Service Categories */}
@@ -41,74 +48,72 @@ export default function HomePage() {
                 type="button"
                 className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition text-left"
               >
-                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                  <Image src={icon} alt="" width={22} height={22} aria-hidden />
-                </div>
+                <Image src={icon} alt="" width={24} height={24} aria-hidden className="flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 text-sm">{name}</p>
+                  <p className="font-medium text-brand-dark text-sm underline">{name}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{description}</p>
                 </div>
-                <Image src="/icons/arrow-right.svg" alt="" width={18} height={18} className="text-gray-400 flex-shrink-0" aria-hidden />
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-gray-400 flex-shrink-0"
+                  aria-hidden
+                >
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
               </button>
             </li>
           ))}
         </ul>
       </section>
 
-      {/* "You're not alone" — yellow background, matches wireframe */}
-      <section className="bg-brand-yellow px-5 pt-12 pb-10">
-        <h2 className="text-2xl font-black text-gray-900 leading-snug max-w-xs">
+      {/* "You're not alone" */}
+      <section className="bg-[#F5F5F5] px-5 pt-12 pb-10 text-center">
+        <h2 className="text-2xl font-medium text-brand-dark leading-snug max-w-xs mx-auto">
           You&rsquo;re not alone in this journey
         </h2>
-        <p className="mt-4 text-sm text-gray-800 max-w-sm leading-relaxed">
+        <div className="flex justify-center my-6">
+          <Image src="/new-icons/hands.svg" alt="" width={80} height={80} aria-hidden />
+        </div>
+        <p className="mt-4 text-sm text-gray-600 max-w-sm mx-auto leading-relaxed">
           People can experience homelessness for many reasons. Our peer
-          navigators share lived experience with the system and help you prepare
-          for the future.
+          navigators share their experiences navigating the support system,
+          and their tips on how to prepare for the future.
         </p>
-        {/* Peer illustration placeholder — honeycomb of faces */}
-        {/* <div className="my-8 flex justify-center">
-          <div className="grid grid-cols-3 gap-3 max-w-[180px]">
-            {Array.from({ length: 9 }).map((_, i) => (
-              <div
-                key={i}
-                className="w-14 h-14 rounded-full bg-white/60 border-2 border-white flex items-center justify-center text-xl"
-              >
-              </div>
-            ))}
-          </div>
-        </div> */}
         <button
           type="button"
-          className="bg-gray-900 text-white text-sm font-bold px-6 py-3 my-5 rounded-xl hover:bg-gray-800 transition"
+          className="mt-6 bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-lg hover:opacity-90 transition"
         >
-          Learn From Peers
+          Learn from Peers
         </button>
       </section>
 
-      {/* Testimonial quote */}
-      <section className="bg-gray-900 px-5 py-10">
-        <p className="text-4xl font-black text-brand-yellow leading-none mb-4">&ldquo;</p>
-        <blockquote className="text-white text-base font-semibold leading-relaxed max-w-sm">
-          YourPeer NYC is the best. The info was useful, easy to understand and
-          helped me find what I needed.
-        </blockquote>
-        <p className="mt-4 text-xs text-gray-400">— Jorge C.</p>
-      </section>
+      {/* Testimonial carousel */}
+      <TestimonialCarousel />
 
       {/* Provider CTA */}
-      <section className="bg-brand-dark px-5 py-10 text-center">
-        <p className="text-white font-bold text-lg">
+      <section className="bg-brand-yellow px-5 py-12 text-center">
+        <h2 className="text-2xl font-medium text-brand-dark leading-snug max-w-xs mx-auto">
           Are you a service provider?
-        </p>
-        <p className="text-gray-400 text-sm mt-2 max-w-xs mx-auto">
-          Our provider portal can help you keep info updated and find other
-          providers for client referrals.
+        </h2>
+        <p className="text-brand-dark/70 text-sm mt-4 max-w-xs mx-auto space-y-1">
+          Our provider portal can help you:<br />
+          Keep clients updated about your services.<br />
+          Find other providers for accurate referrals.<br />
+          Learn about your clients.<br />
+          Manage appointments.
         </p>
         <Link
           href="#"
-          className="mt-5 inline-block bg-brand-yellow text-gray-900 text-sm font-bold px-6 py-3 rounded-xl hover:brightness-95 transition"
+          className="mt-6 inline-block bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-lg hover:opacity-90 transition"
         >
-          Sign Up for Provider Portal
+          Sign into Provider Portal
         </Link>
       </section>
 
@@ -129,7 +134,7 @@ export default function HomePage() {
         className="fixed bottom-20 right-5 w-14 h-14 bg-brand-yellow rounded-full shadow-lg flex items-center justify-center hover:brightness-95 transition z-50"
         aria-label="Chat with a peer navigator"
       >
-        <Image src="/icons/chat.svg" alt="" width={24} height={24} aria-hidden />
+        <Image src="/new-icons/chat-search.svg" alt="" width={24} height={24} aria-hidden />
       </Link>
     </div>
   );

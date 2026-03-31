@@ -144,7 +144,7 @@ export default function NavigatorSessionDetailPage() {
       {/* Assign to… — unassigned + supervisor role */}
       {isUnassigned && isSupervisor && (
         <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-2">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Assign to Navigator</p>
+          <p className="text-xs font-normal text-gray-500 uppercase tracking-wide">Assign to Navigator</p>
           <select
             aria-label="Assign to navigator"
             defaultValue=""
@@ -167,7 +167,7 @@ export default function NavigatorSessionDetailPage() {
       {/* Transfer + Re-run routing — active assigned sessions, navigator or supervisor */}
       {!isClosed && !isUnassigned && (isMySession || isSupervisor) && (
         <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Routing</p>
+          <p className="text-xs font-normal text-gray-500 uppercase tracking-wide">Routing</p>
           <div className="flex gap-2">
             <select
               aria-label="Transfer to navigator"
@@ -239,7 +239,7 @@ export default function NavigatorSessionDetailPage() {
       {/* Session Notes */}
       {!showCloseConfirm && (
         <div>
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-2">
             Session Notes
           </h2>
           {isClosed || isSupervisor ? (
@@ -270,7 +270,7 @@ export default function NavigatorSessionDetailPage() {
       {/* Referrals */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide">
             Referrals ({session.referrals.length})
           </h2>
           {!isClosed && !isSupervisor && isMySession && (
@@ -308,7 +308,7 @@ export default function NavigatorSessionDetailPage() {
 
       {/* Timeline */}
       <div>
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">
           Timeline
         </h2>
         <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-3">

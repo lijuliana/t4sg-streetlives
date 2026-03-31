@@ -27,24 +27,24 @@ export default function NavigatorDashboardPage() {
       {/* Summary strip */}
       <div className="flex gap-4 bg-white border border-gray-200 rounded-xl px-5 py-4">
         <div className="flex-1 text-center">
-          <p className="text-2xl font-semibold text-gray-900">{activeCount}</p>
+          <p className="text-2xl font-normal text-gray-900">{activeCount}</p>
           <p className="text-xs text-green-600 font-medium mt-0.5">Active</p>
         </div>
         <div className="w-px bg-gray-200" />
         <div className="flex-1 text-center">
-          <p className={`text-2xl font-semibold mt-0.5 ${newCount > 0 ? "text-amber-600" : "text-gray-900"}`}>{newCount}</p>
+          <p className={`text-2xl font-normal mt-0.5 ${newCount > 0 ? "text-amber-600" : "text-gray-900"}`}>{newCount}</p>
           <p className="text-xs text-amber-600 font-medium mt-0.5">New Requests</p>
         </div>
         <div className="w-px bg-gray-200" />
         <div className="flex-1 text-center">
-          <p className="text-2xl font-semibold text-gray-900">{closedCount}</p>
+          <p className="text-2xl font-normal text-gray-900">{closedCount}</p>
           <p className="text-xs text-gray-400 font-medium mt-0.5">Closed</p>
         </div>
       </div>
 
       {/* Active */}
       <section>
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">
           Active
         </h2>
         {active.length === 0 ? (
@@ -62,7 +62,7 @@ export default function NavigatorDashboardPage() {
 
       {/* New Requests (unassigned) */}
       <section>
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">
           New Requests
         </h2>
         {newRequests.length === 0 ? (
@@ -80,7 +80,7 @@ export default function NavigatorDashboardPage() {
 
       {/* Past Sessions */}
       <section>
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">
           Past Sessions
         </h2>
         {past.length === 0 ? (

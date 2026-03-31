@@ -43,7 +43,7 @@ export default function DashboardShell({ title, role, backHref, action, children
               <ArrowLeft size={20} strokeWidth={2} />
             </button>
           )}
-          <Link href="/" className="font-bold text-sm text-gray-900 hover:opacity-70 transition-opacity">
+          <Link href="/" className="font-medium text-sm text-gray-900 hover:opacity-70 transition-opacity">
             StreetLives
           </Link>
           <span
@@ -64,7 +64,7 @@ export default function DashboardShell({ title, role, backHref, action, children
           )}
         </div>
         <div className="max-w-lg mx-auto px-4 pb-3">
-          <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
+          <h1 className="text-xl font-normal text-gray-900">{title}</h1>
         </div>
       </header>
 

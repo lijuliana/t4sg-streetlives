@@ -71,7 +71,7 @@ export default function NewPostForm() {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full bg-brand-yellow text-gray-900 font-bold py-3 rounded-xl hover:brightness-95 transition disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-full bg-brand-yellow text-gray-900 font-medium py-3 rounded-xl hover:brightness-95 transition disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {isSubmitting ? "Posting…" : "Post"}
       </button>

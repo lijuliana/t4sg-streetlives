@@ -34,11 +34,11 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
       className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm"
     >
       <div className="flex items-center gap-3 mb-3">
-        <div className="w-9 h-9 rounded-full bg-brand-yellow flex items-center justify-center text-xs font-bold text-gray-900 flex-shrink-0">
+        <div className="w-9 h-9 rounded-full bg-brand-yellow flex items-center justify-center text-xs font-medium text-gray-900 flex-shrink-0">
           {initials}
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-gray-900 truncate">
+          <p className="text-sm font-normal text-gray-900 truncate">
             {displayEmail}
           </p>
           <p className="text-xs text-gray-400">

@@ -19,7 +19,7 @@ export default function UserDashboardPage() {
     <DashboardShell title="My Sessions" role="user">
       {/* Current Session */}
       <section>
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">
           Current Session
         </h2>
         {active.length === 0 ? (
@@ -54,7 +54,7 @@ export default function UserDashboardPage() {
 
       {/* Past Sessions */}
       <section>
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">
           Past Sessions
         </h2>
         {past.length === 0 ? (

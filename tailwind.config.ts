@@ -15,9 +15,10 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          yellow: "#FFCC00",
+          yellow: "#FFDC00",
+          grey: "#C8C8C8",
           exit: "#E83E5C",
-          dark: "#333333",
+          dark: "#323232",
         },
       },
       fontFamily: {

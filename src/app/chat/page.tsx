@@ -297,7 +297,7 @@ export default function ChatPage() {
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
         <div className="w-8" />
-        <span className="font-bold text-base text-gray-900">StreetLives</span>
+        <span className="font-medium text-base text-gray-900">StreetLives</span>
         <button type="button" onClick={handleEndChat} className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 transition" aria-label="End chat">
           END CHAT
           <X size={18} strokeWidth={2.5} />
@@ -378,7 +378,7 @@ export default function ChatPage() {
             <path d="M3 18v-1a5 5 0 0 1 5-5h8a5 5 0 0 1 5 5v1" />
             <circle cx="12" cy="7" r="4" />
           </svg>
-          <span className="text-[9px] font-bold text-gray-900 tracking-widest">LIVE</span>
+          <span className="text-[9px] font-medium text-gray-900 tracking-widest">LIVE</span>
         </button>
       )}
     </div>
