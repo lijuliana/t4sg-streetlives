@@ -1,19 +1,16 @@
-import type { Session, SessionStatus } from "../types.js";
+import type { Session, SessionStatus, RoutingReason } from "../types.js";
 
-/**
- * Interface for the session store.
- * The in-memory implementation below is sufficient for local development.
- * Swap for a Postgres/SQLite implementation that satisfies the same interface
- * when persistence across restarts is needed.
- */
-interface SessionStoreInterface {
-  /**
-   * Persists a new session. The caller is responsible for generating sessionId
-   * (so it can be used in the Matrix room name before this record is written).
-   */
+export interface SessionStoreInterface {
   create(data: Omit<Session, "createdAt">): Session;
   findById(sessionId: string): Session | undefined;
-  updateStatus(sessionId: string, status: SessionStatus): boolean;
+  updateStatus(sessionId: string, status: SessionStatus, closedAt?: string): boolean;
+  setNavigatorAssignment(
+    sessionId: string,
+    navigatorId: string | null,
+    routingVersion: string | null,
+    routingReason: RoutingReason | null,
+  ): boolean;
+  countActiveByNavigator(navigatorId: string): number;
   list(): Session[];
 }
 
@@ -33,11 +30,32 @@ class InMemorySessionStore implements SessionStoreInterface {
     return this.sessions.get(sessionId);
   }
 
-  updateStatus(sessionId: string, status: SessionStatus): boolean {
+  updateStatus(sessionId: string, status: SessionStatus, closedAt?: string): boolean {
     const session = this.sessions.get(sessionId);
     if (!session) return false;
     session.status = status;
+    if (closedAt !== undefined) session.closedAt = closedAt;
     return true;
+  }
+
+  setNavigatorAssignment(
+    sessionId: string,
+    navigatorId: string | null,
+    routingVersion: string | null,
+    routingReason: RoutingReason | null,
+  ): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) return false;
+    session.assignedNavigatorId = navigatorId;
+    session.routingVersion = routingVersion;
+    session.routingReason = routingReason;
+    return true;
+  }
+
+  countActiveByNavigator(navigatorId: string): number {
+    return Array.from(this.sessions.values()).filter(
+      (s) => s.assignedNavigatorId === navigatorId && s.status === "active",
+    ).length;
   }
 
   list(): Session[] {
@@ -45,5 +63,5 @@ class InMemorySessionStore implements SessionStoreInterface {
   }
 }
 
-// Singleton — replace this export with a DB-backed implementation later.
+// Singleton — replace with a DB-backed implementation when persistence is needed.
 export const sessionStore: SessionStoreInterface = new InMemorySessionStore();

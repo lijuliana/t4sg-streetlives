@@ -1,38 +1,104 @@
-/** Lifecycle states for a chat session. Closed sessions are read-only. */
-export type SessionStatus = "active" | "closed";
+/** Lifecycle states for a chat session. */
+export type SessionStatus = "unassigned" | "active" | "closed" | "transferred";
 
-/** Who sent a message in the backend message store. */
-export type MessageSender = "guest" | "service";
+// ── Navigator types ───────────────────────────────────────────────────────────
+
+export type NavGroup = "CUNY_PIN" | "HOUSING_WORKS" | "DYCD";
+export type NavigatorStatus = "available" | "away" | "offline";
+
+export interface NavigatorProfile {
+  id: string;
+  userId: string;             // Matrix user ID, e.g. @alice:homeserver.org
+  navGroup: NavGroup;         // Stored for future routing use; not a hard filter right now
+  expertiseTags: string[];
+  languages: string[];        // ISO 639-1 codes, lowercase
+  capacity: number;           // max concurrent active sessions
+  status: NavigatorStatus;
+  isGeneralIntake: boolean;   // if true, eligible for initial session assignment
+  createdAt: string;          // ISO 8601
+  updatedAt: string;          // ISO 8601
+}
+
+// ── Need categories ───────────────────────────────────────────────────────────
+
+export type NeedCategory =
+  | "housing"
+  | "employment"
+  | "health"
+  | "benefits"
+  | "youth_services"
+  | "education"
+  | "other";
+
+// ── Routing types ─────────────────────────────────────────────────────────────
+
+export type RoutingMode = "initial" | "transfer";
+
+export interface RoutingInput {
+  needCategory: NeedCategory;
+  tags?: string[];
+  language?: string;
+}
+
+/**
+ * Explainability payload included in successful assignments.
+ * need_category is retained in sessions for analytics but does not constrain
+ * routing in v2 — all navigators are treated as cross-trained.
+ */
+export interface RoutingReason {
+  generalIntakeOnly: boolean;     // true for initial assignment, false for transfer
+  languageRequested: string | null;
+  languageMatch: boolean;
+  loadRatio: number;              // active / capacity at assignment time
+  score: number;                  // deterministic sort key (lower loadRatio = higher score)
+}
+
+export interface RoutingResult {
+  navigator: NavigatorProfile;
+  routingReason: RoutingReason;
+  routingVersion: string;
+}
+
+/** Discriminated union returned by assignNavigator(). */
+export type RoutingOutcome =
+  | { assigned: true;  navigator: NavigatorProfile; routingReason: RoutingReason; routingVersion: string }
+  | { assigned: false; reason: string; routingVersion: string };
+
+// ── Session ───────────────────────────────────────────────────────────────────
 
 /**
  * The app's system-of-record for a single guest↔navigator chat session.
  * Matrix is only the transport layer; this record owns the session lifecycle.
- *
- * Nullable expansion hooks:
- *   navigatorId — assigned navigator (from Navigator auth system, future)
- *   referralId  — primary linked referral (denormalised convenience, future)
- *   closedAt    — ISO 8601 timestamp when the session was closed
  */
 export interface Session {
   sessionId: string;
   matrixRoomId: string;
   status: SessionStatus;
   createdAt: string;
-  navigatorId: string | null;
-  referralId: string | null;
   closedAt: string | null;
+  needCategory: NeedCategory | null;
+  assignedNavigatorId: string | null;
+  routingVersion: string | null;
+  routingReason: RoutingReason | null;
+  routingFailReason: string | null;
+  referralId: string | null;
 }
 
-/** A message stored in the backend message store. Matrix is a transport mirror. */
-export interface Message {
-  messageId: string;
+// ── Session events (audit log) ────────────────────────────────────────────────
+
+export type SessionEventType = "created" | "assigned" | "transferred" | "closed";
+
+export interface SessionEvent {
+  id: string;
   sessionId: string;
-  sender: MessageSender;
-  body: string;
-  sentAt: string;
+  eventType: SessionEventType;
+  actor: string | null;
+  timestamp: string;
+  metadata: Record<string, unknown>;
 }
 
-/** A free-text note attached to a session. Stored in backend only, not in Matrix. */
+// ── Notes, Referrals ──────────────────────────────────────────────────────────
+
 export interface Note {
   noteId: string;
   sessionId: string;
@@ -41,7 +107,6 @@ export interface Note {
   createdAt: string;
 }
 
-/** A referral attached to a session. Stored in backend only, not in Matrix. */
 export interface Referral {
   referralId: string;
   sessionId: string;
@@ -53,18 +118,29 @@ export interface Referral {
 
 // ── Request / response shapes ─────────────────────────────────────────────────
 
+export interface CreateSessionRequest {
+  needCategory?: NeedCategory;
+  tags?: string[];
+  language?: string;
+}
+
 export interface CreateSessionResponse {
   sessionId: string;
   status: SessionStatus;
   createdAt: string;
+  assignedNavigatorId: string | null;
+  routingVersion: string | null;
+  routingReason: RoutingReason | null;
+  routingFailReason: string | null;
 }
 
-export interface SendMessageRequest {
+export interface SendGuestMessageRequest {
   body: string;
 }
 
-export interface MessagesResponse {
-  messages: Message[];
+export interface SendNavigatorMessageRequest {
+  text: string;
+  navigatorId: string;
 }
 
 export interface CreateNoteRequest {
@@ -76,4 +152,39 @@ export interface CreateReferralRequest {
   title: string;
   description?: string;
   createdBy?: string;
+}
+
+export interface CreateNavigatorProfileRequest {
+  userId: string;
+  navGroup: NavGroup;
+  expertiseTags?: string[];
+  languages?: string[];
+  capacity?: number;
+  status?: NavigatorStatus;
+  isGeneralIntake?: boolean;
+}
+
+export interface UpdateNavigatorProfileRequest {
+  navGroup?: NavGroup;
+  expertiseTags?: string[];
+  languages?: string[];
+  capacity?: number;
+  status?: NavigatorStatus;
+  isGeneralIntake?: boolean;
+}
+
+export interface AssignRoutingRequest {
+  needCategory: NeedCategory;
+  tags?: string[];
+  language?: string;
+  mode?: RoutingMode;
+}
+
+export interface TransferSessionRequest {
+  targetNavigatorId?: string;
+  needCategory?: NeedCategory;
+  tags?: string[];
+  language?: string;
+  reason?: string;
+  actor?: string;
 }

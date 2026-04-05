@@ -109,8 +109,22 @@ const GuestChatPage: React.FC<GuestChatPageProps> = ({ session, onError }) => {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(data.error ?? `Send failed (${res.status})`);
       }
-      const message = (await res.json()) as BackendMessage;
-      const display = toDisplayMessage(message);
+      // Backend now returns a SessionMessage shape (id, senderType, text, createdAt),
+      // not the legacy BackendMessage shape. Map it manually before display.
+      const raw = (await res.json()) as {
+        id?: string;
+        senderType?: string;
+        text?: string;
+        createdAt?: string;
+      };
+      const backendMsg: BackendMessage = {
+        messageId: raw.id ?? "",
+        sessionId,
+        sender: "guest",
+        body: raw.text ?? "",
+        sentAt: raw.createdAt ?? new Date().toISOString(),
+      };
+      const display = toDisplayMessage(backendMsg);
       if (!seenIds.current.has(display.eventId)) {
         seenIds.current.add(display.eventId);
         setMessages((prev) => [...prev, display]);

@@ -4,6 +4,9 @@ import express from "express";
 import cors from "cors";
 import { initMatrixAuth } from "./services/matrixAuth.js";
 import sessionRoutes from "./routes/sessions.js";
+import navigatorRoutes from "./routes/navigators.js";
+import routingRoutes from "./routes/routing.js";
+import supervisorRoutes from "./routes/supervisor.js";
 
 // ── Env validation ────────────────────────────────────────────────────────────
 const REQUIRED_ENV = [
@@ -31,9 +34,6 @@ const authManager = initMatrixAuth(
   sessionFile,
 );
 
-// Load any persisted credentials from disk, then eagerly validate them.
-// A login failure here is logged but does not abort startup — the first
-// session-creation request will surface the error with a clear message.
 await authManager.init();
 authManager
   .getToken()
@@ -41,6 +41,13 @@ authManager
   .catch((err: unknown) =>
     console.error("[backend] Matrix service account auth failed at startup:", err),
   );
+
+// ── Optional dev seeding ──────────────────────────────────────────────────────
+if (process.env.SEED_NAVIGATORS === "true" || process.env.NODE_ENV === "development") {
+  const { seedNavigators } = await import("./seeds/navigators.js");
+  seedNavigators();
+  console.log("[backend] Dev navigator profiles seeded");
+}
 
 // ── App ───────────────────────────────────────────────────────────────────────
 const app = express();
@@ -52,6 +59,9 @@ app.use(express.json());
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/sessions", sessionRoutes);
+app.use("/api/navigators", navigatorRoutes);
+app.use("/api/routing", routingRoutes);
+app.use("/api/supervisor", supervisorRoutes);
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {

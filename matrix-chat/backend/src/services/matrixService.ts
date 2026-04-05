@@ -2,20 +2,28 @@
  * Thin wrapper around the Matrix Client-Server API.
  * All Matrix I/O for the backend lives here so route handlers stay clean.
  *
- * Token management is handled by matrixAuth.ts — this module calls
- * getAuthManager().getToken() before each request and retries exactly once
- * after getAuthManager().handleTokenRejected() on M_UNKNOWN_TOKEN.
+ * Token management is handled by matrixAuth.ts.
+ * Uses built-in fetch (Node >= 18). No matrix-js-sdk on the backend.
  *
- * Uses the built-in fetch (Node ≥ 18). No matrix-js-sdk on the backend.
- *
- * Encryption note: rooms are created unencrypted. Upgrade path: add the
- * m.room.encryption state event to createRoom's initial_state and call
+ * Encryption note: rooms are currently created unencrypted.
+ * Upgrade path: add m.room.encryption to initial_state in createRoom and call
  * initRustCrypto() on any future Matrix-connected client.
+ *
+ * Navigator access model:
+ *   - When a navigator is assigned, they are invited to the room via inviteToRoom().
+ *   - On transfer, the departing navigator is kicked via kickFromRoom() BEFORE the
+ *     new navigator is invited, preserving room continuity for the guest.
+ *   - The service account (room creator) always retains membership.
+ *
+ * Assumptions / limitations:
+ *   - Navigator Matrix userIds must be pre-registered on the homeserver.
+ *   - The service account must have sufficient power level to invite and kick.
+ *   - Rooms are unencrypted; E2E can be layered on later without breaking the session model.
+ *   - Token refresh is handled by matrixAuth.ts; invite/kick failures are non-fatal
+ *     (the session assignment is still recorded in the DB even if Matrix is unreachable).
  */
 
 import { getAuthManager } from "./matrixAuth.js";
-
-// ── Error type ────────────────────────────────────────────────────────────────
 
 interface MatrixErrorBody {
   errcode?: string;
@@ -33,9 +41,6 @@ class MatrixApiError extends Error {
   }
 }
 
-// ── Core request helpers ──────────────────────────────────────────────────────
-
-/** Executes one authenticated Matrix request without any retry logic. */
 async function executeRequest<T>(
   method: "GET" | "POST" | "PUT",
   baseUrl: string,
@@ -67,12 +72,6 @@ async function executeRequest<T>(
   return json as T;
 }
 
-/**
- * Authenticated Matrix request with automatic token-refresh retry.
- *
- * On M_UNKNOWN_TOKEN: asks the auth manager to refresh/re-login, then retries
- * the request exactly once. Any further failure propagates to the caller.
- */
 async function matrixRequest<T>(
   method: "GET" | "POST" | "PUT",
   baseUrl: string,
@@ -87,7 +86,6 @@ async function matrixRequest<T>(
   } catch (err) {
     if (err instanceof MatrixApiError && err.errcode === "M_UNKNOWN_TOKEN") {
       const freshToken = await auth.handleTokenRejected();
-      // Retry once with the new token. If this also fails, the error propagates.
       return executeRequest<T>(method, baseUrl, path, body, freshToken);
     }
     throw err;
@@ -96,17 +94,6 @@ async function matrixRequest<T>(
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/**
- * Creates a private, unencrypted room using the service account.
- * The room name and topic embed the internal sessionId so navigators can
- * identify chats easily in Element and in the future dashboard.
- *
- * Naming scheme:
- *   Name:  "Chat · {sessionId[:8]}"   — short, non-sensitive identifier
- *   Topic: "Streetlives session | ID: {sessionId}"
- *
- * The service account becomes the room creator and sole initial member.
- */
 export async function createRoom(
   baseUrl: string,
   sessionId: string,
@@ -117,12 +104,6 @@ export async function createRoom(
     visibility: "private",
     name: `Chat · ${shortId}`,
     topic: `Streetlives session | ID: ${sessionId}`,
-    // Encryption upgrade path:
-    //   initial_state: [{
-    //     type: "m.room.encryption",
-    //     state_key: "",
-    //     content: { algorithm: "m.megolm.v1.aes-sha2" },
-    //   }],
   });
   return { roomId: res.room_id };
 }
@@ -130,16 +111,9 @@ export async function createRoom(
 export interface RoomMessage {
   eventId: string;
   body: string;
-  timestamp: number; // epoch ms
+  timestamp: number;
 }
 
-/**
- * Fetches the most recent messages from a Matrix room (up to 200 events).
- * Returns events in chronological order (oldest first).
- *
- * Callers are responsible for deduplication — this function always fetches
- * from the homeserver and returns everything it finds.
- */
 export async function fetchRoomMessages(
   baseUrl: string,
   roomId: string,
@@ -154,7 +128,6 @@ export async function fetchRoomMessages(
     }>;
   }>("GET", baseUrl, path, null);
 
-  // chunk is newest-first; reverse for chronological order
   return data.chunk
     .filter(
       (ev) =>
@@ -172,20 +145,56 @@ export async function fetchRoomMessages(
 
 /**
  * Sends a plain-text message to a room as the service account.
- * The displayName prefix (e.g. "[Guest]") is prepended so Navigator-side
- * Matrix clients can identify the sender until per-user accounts are added.
+ * Returns the Matrix event_id so callers can back-fill it on the local record.
  */
 export async function sendMessage(
   baseUrl: string,
   roomId: string,
   displayName: string,
   body: string,
-): Promise<void> {
+): Promise<string | null> {
   const txnId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  await matrixRequest(
+  const res = await matrixRequest<{ event_id?: string }>(
     "PUT",
     baseUrl,
     `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
     { msgtype: "m.text", body: `${displayName}: ${body}` },
   );
+  return res.event_id ?? null;
+}
+
+/**
+ * Invites a Matrix user to a room so they can join and read messages.
+ * Best-effort: Matrix errors are logged but should not block session creation.
+ *
+ * The invited user must accept the invite from their own Matrix client.
+ * The service account must have permission to invite in this room.
+ */
+export async function inviteToRoom(
+  baseUrl: string,
+  roomId: string,
+  userId: string,
+): Promise<void> {
+  await matrixRequest("POST", baseUrl, `/rooms/${encodeURIComponent(roomId)}/invite`, {
+    user_id: userId,
+  });
+}
+
+/**
+ * Removes a Matrix user from a room immediately.
+ * Called on navigator transfer to prevent the departing navigator from reading
+ * further messages. Room continuity for the guest is unaffected.
+ *
+ * The service account must have sufficient power level to kick members.
+ */
+export async function kickFromRoom(
+  baseUrl: string,
+  roomId: string,
+  userId: string,
+  reason?: string,
+): Promise<void> {
+  await matrixRequest("POST", baseUrl, `/rooms/${encodeURIComponent(roomId)}/kick`, {
+    user_id: userId,
+    ...(reason && { reason }),
+  });
 }
