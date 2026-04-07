@@ -26,23 +26,16 @@ export default function SessionCard({ session, viewerRole, index = 0 }: Props) {
 
   const primaryName =
     viewerRole === "navigator" || viewerRole === "supervisor"
-      ? session.userDisplayName
+      ? `#${session.id.slice(-5).toUpperCase()}`
       : session.navigatorName;
 
   const initials =
-    viewerRole === "navigator" || viewerRole === "supervisor"
-      ? session.userDisplayName
-          .split(" ")
-          .map((w) => w[0])
-          .join("")
-          .toUpperCase()
-          .slice(0, 2)
-      : session.navigatorName
-          .split(" ")
-          .map((w) => w[0])
-          .join("")
-          .toUpperCase()
-          .slice(0, 2);
+    session.navigatorName
+      .split(" ")
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
 
   return (
     <motion.button
@@ -53,8 +46,8 @@ export default function SessionCard({ session, viewerRole, index = 0 }: Props) {
       transition={{ duration: 0.25, delay: index * 0.05 }}
       className="w-full text-left bg-white border border-gray-200 rounded-xl shadow-sm px-4 py-3.5 flex items-center gap-3 hover:border-gray-300 hover:shadow-md transition"
     >
-      {/* Avatar — gray placeholder for unassigned, yellow with initials otherwise */}
-      {isUnassigned ? (
+      {/* Avatar — gray silhouette for navigator/supervisor (anonymous), yellow with initials for user view */}
+      {(isUnassigned || viewerRole === "navigator" || viewerRole === "supervisor") ? (
         <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -79,11 +72,6 @@ export default function SessionCard({ session, viewerRole, index = 0 }: Props) {
               {t}
             </span>
           ))}
-          {session.assignedByRouting && viewerRole === "supervisor" && (
-            <span className="text-[10px] bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded-full">
-              Routed
-            </span>
-          )}
           {awaitingReview && viewerRole === "supervisor" && (
             <span className="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full font-medium">
               Needs Review

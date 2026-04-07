@@ -122,16 +122,18 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
     if (hasInitialized.current) return;
     hasInitialized.current = true;
 
-    // Restore an in-progress session if one was saved (e.g. user navigated away and back)
+    // Restore an in-progress session if one was saved (e.g. user navigated away and back).
+    // Only restore if the session is still active — skip closed sessions so the greeting shows.
     const storedId = sessionStorage.getItem("chat_session_id");
     if (storedId) {
       const session = useStore.getState().sessions.find((s) => s.id === storedId);
-      if (session) {
+      if (session && session.status !== "closed") {
         setActiveSessionId(storedId);
         setChatState("live");
         if (session.navigatorName) setRoutedNavName(session.navigatorName.split(" ")[0]);
         return;
       }
+      // Session closed or no longer exists — clear the stale ID and fall through to greeting
       sessionStorage.removeItem("chat_session_id");
     }
 

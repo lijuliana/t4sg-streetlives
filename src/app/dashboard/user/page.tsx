@@ -16,7 +16,11 @@ export default function UserDashboardPage() {
   const allSessions = useStore((s) => s.sessions);
   const sessions = allSessions.filter((session) => session.userId === DEMO_USER_ID);
 
-  const active = sessions.filter((s) => s.status !== "closed");
+  const allActive = sessions.filter((s) => s.status !== "closed").sort(
+    (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+  );
+  // A user should only have one active session at a time — show the most recent
+  const active = allActive.slice(0, 1);
   const past = sessions.filter((s) => s.status === "closed");
 
   return (
@@ -69,10 +73,10 @@ export default function UserDashboardPage() {
                     </div>
                     <SessionStatusBadge status={session.status} size="sm" />
                   </button>
-                  {/* Continue Chat — visually inside the card */}
+                  {/* Continue Chat — goes to home screen where the chat FAB lives */}
                   <div className="px-4 pb-3 border-t border-gray-100 pt-2">
                     <Link
-                      href="/chat"
+                      href="/"
                       className="flex items-center justify-center w-full bg-brand-yellow text-gray-900 text-sm font-medium py-2.5 rounded-xl hover:brightness-95 transition"
                     >
                       Continue Chat

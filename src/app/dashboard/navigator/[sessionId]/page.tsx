@@ -100,7 +100,7 @@ export default function NavigatorSessionDetailPage() {
 
   return (
     <DashboardShell
-      title={session.userDisplayName}
+      title={`#${session.id.slice(-5).toUpperCase()}`}
       role={isSupervisor ? "supervisor" : "navigator"}
       backHref={isSupervisor ? "/dashboard/supervisor" : "/dashboard/navigator"}
       action={

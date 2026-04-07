@@ -384,7 +384,7 @@ export const useStore = create<StreetLivesStore>()(
       },
     }),
     {
-      name: "streetlives-store-v7",
+      name: "streetlives-store-v8",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         sessions: state.sessions,
