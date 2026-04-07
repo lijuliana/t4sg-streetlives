@@ -3,6 +3,15 @@ import Image from "next/image";
 import Navbar from "@/components/Navbar";
 import TestimonialCarousel from "@/components/TestimonialCarousel";
 import ChatFAB from "@/components/ChatFAB";
+import { auth0 } from "@/lib/auth0";
+
+const ROLES_CLAIM = "https://streetlives.app/roles";
+
+const ROLE_DASHBOARD: Record<string, { href: string; label: string }> = {
+  navigator: { href: "/dashboard/navigator", label: "Go to Navigator Dashboard" },
+  supervisor: { href: "/dashboard/supervisor", label: "Go to Supervisor Dashboard" },
+  user: { href: "/dashboard/user", label: "Go to My Dashboard" },
+};
 
 const services = [
   { icon: "/new-icons/house.svg",       name: "Accommodations",  description: "A place to stay, shelter, vouchers" },
@@ -18,7 +27,12 @@ const services = [
   { icon: "/new-icons/chat.svg",        name: "Need Help?",      description: "Use our chat assistant" },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await auth0.getSession();
+  const roles: string[] = (session?.user?.[ROLES_CLAIM] as string[]) ?? [];
+  const matchedRole = roles.find((r) => ROLE_DASHBOARD[r] !== undefined) ?? (session ? "user" : null);
+  const dashboard = matchedRole ? ROLE_DASHBOARD[matchedRole] : null;
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -32,12 +46,21 @@ export default function HomePage() {
           Search through hundreds of free support services in NYC that are right
           for you.
         </p>
-        <button
-          type="button"
-          className="mt-6 bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-lg hover:opacity-90 transition"
-        >
-          Get started below
-        </button>
+        {dashboard ? (
+          <Link
+            href={dashboard.href}
+            className="mt-6 inline-block bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-lg hover:opacity-90 transition"
+          >
+            {dashboard.label}
+          </Link>
+        ) : (
+          <button
+            type="button"
+            className="mt-6 bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-lg hover:opacity-90 transition"
+          >
+            Get started below
+          </button>
+        )}
       </section>
 
       {/* Service Categories */}

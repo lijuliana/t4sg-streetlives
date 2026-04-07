@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
-import RoleSwitcher from "@/components/RoleSwitcher";
 import StoreSync from "@/components/StoreSync";
 import "./globals.css";
 
@@ -22,7 +21,6 @@ export default function RootLayout({
       <body className="min-h-screen bg-gray-50 font-sans">
         {children}
         <Toaster position="top-center" richColors />
-        <RoleSwitcher />
         <StoreSync />
       </body>
     </html>

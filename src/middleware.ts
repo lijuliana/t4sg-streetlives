@@ -16,7 +16,10 @@ export async function middleware(request: NextRequest) {
   }
 
   // Role-protected routes
-  if (pathname.startsWith("/navigator") || pathname.startsWith("/supervisor")) {
+  if (
+    pathname.startsWith("/dashboard/navigator") ||
+    pathname.startsWith("/dashboard/supervisor")
+  ) {
     const session = await auth0.getSession(request);
 
     if (!session) {
@@ -27,11 +30,11 @@ export async function middleware(request: NextRequest) {
 
     const roles: string[] = (session.user?.[ROLES_CLAIM] as string[]) ?? [];
 
-    if (pathname.startsWith("/navigator") && !roles.includes("navigator")) {
+    if (pathname.startsWith("/dashboard/navigator") && !roles.includes("navigator")) {
       return new NextResponse("Forbidden", { status: 403 });
     }
 
-    if (pathname.startsWith("/supervisor") && !roles.includes("supervisor")) {
+    if (pathname.startsWith("/dashboard/supervisor") && !roles.includes("supervisor")) {
       return new NextResponse("Forbidden", { status: 403 });
     }
 

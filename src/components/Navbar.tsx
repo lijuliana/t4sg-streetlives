@@ -4,12 +4,24 @@ import { cn } from "@/lib/utils";
 import { auth0 } from "@/lib/auth0";
 import NavMenu from "@/components/NavMenu";
 
+const ROLES_CLAIM = "https://streetlives.app/roles";
+
+const ROLE_DASHBOARD: Record<string, string> = {
+  navigator: "/dashboard/navigator",
+  supervisor: "/dashboard/supervisor",
+  user: "/dashboard/user",
+};
+
 interface NavbarProps {
   className?: string;
 }
 
 export default async function Navbar({ className }: NavbarProps) {
   const session = await auth0.getSession();
+
+  const roles: string[] = (session?.user?.[ROLES_CLAIM] as string[]) ?? [];
+  const matchedRole = roles.find((r) => ROLE_DASHBOARD[r] !== undefined) ?? (session ? "user" : null);
+  const dashboardHref = matchedRole ? ROLE_DASHBOARD[matchedRole] : null;
 
   return (
     <header
@@ -40,14 +52,30 @@ export default async function Navbar({ className }: NavbarProps) {
       {/* Right: auth links + Quick Exit */}
       <div className="flex items-center gap-3">
         {session ? (
-          <a
-            href="/auth/logout"
-            className="text-sm text-gray-600 hover:text-brand-dark transition-colors"
-          >
-            Log out
-          </a>
+          <>
+            {dashboardHref && (
+              <Link
+                href={dashboardHref}
+                className="text-sm font-medium text-brand-dark hover:opacity-70 transition-opacity hidden sm:inline"
+              >
+                Dashboard
+              </Link>
+            )}
+            <a
+              href="/auth/logout"
+              className="text-sm text-gray-600 hover:text-brand-dark transition-colors"
+            >
+              Log out
+            </a>
+          </>
         ) : (
           <>
+            <Link
+              href="/dashboard/user"
+              className="text-sm font-medium text-brand-dark hover:opacity-70 transition-opacity hidden sm:inline"
+            >
+              Dashboard
+            </Link>
             <a
               href="/auth/signin"
               className="text-sm text-gray-600 hover:opacity-70 transition-opacity hidden sm:inline"

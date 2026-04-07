@@ -19,3 +19,5 @@ node_modules/
 *.tsbuildinfo
 
 function.zip
+
+migration.sql
