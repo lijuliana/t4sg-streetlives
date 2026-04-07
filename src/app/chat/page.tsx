@@ -122,19 +122,17 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
     if (hasInitialized.current) return;
     hasInitialized.current = true;
 
-    // Restore an in-progress session if one was saved (e.g. user navigated away and back).
-    // Only restore if the session is still active — skip closed sessions so the greeting shows.
-    const storedId = sessionStorage.getItem("chat_session_id");
-    if (storedId) {
-      const session = useStore.getState().sessions.find((s) => s.id === storedId);
-      if (session && session.status !== "closed") {
-        setActiveSessionId(storedId);
-        setChatState("live");
-        if (session.navigatorName) setRoutedNavName(session.navigatorName.split(" ")[0]);
-        return;
-      }
-      // Session closed or no longer exists — clear the stale ID and fall through to greeting
-      sessionStorage.removeItem("chat_session_id");
+    // Restore an active session from the store (persisted in localStorage via Zustand).
+    // This means logged-in users automatically get their session back across page loads.
+    // Logged-out users (no session in store) always see the fresh greeting.
+    const existingSession = useStore.getState().sessions.find(
+      (s) => s.userId === "user-1" && s.status !== "closed"
+    );
+    if (existingSession) {
+      setActiveSessionId(existingSession.id);
+      setChatState("live");
+      if (existingSession.navigatorName) setRoutedNavName(existingSession.navigatorName.split(" ")[0]);
+      return;
     }
 
     setTimeout(() => addLocalMessage({ role: "bot", content: "Hi, we're here to help guide you through this service" }), 300);
@@ -176,7 +174,6 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
 
               const newSession = createSession("user-1", "Jordan M.", routedNav.id, selectedTopic, true);
               setActiveSessionId(newSession.id);
-              sessionStorage.setItem("chat_session_id", newSession.id);
               seedChatMessages(newSession.id, localMessagesRef.current.map((m) => ({ role: m.role, content: m.content, serviceId: m.serviceId })));
 
               setTimeout(() => inputRef.current?.focus(), 100);
@@ -217,7 +214,6 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
   };
 
   const handleStartNewChat = () => {
-    sessionStorage.removeItem("chat_session_id");
     window.location.reload();
   };
 
@@ -246,13 +242,13 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
                 <button
                   type="button"
                   onClick={() => router.push(`/services/${msg.serviceId}`)}
-                  className="bg-brand-yellow text-gray-900 text-sm px-4 py-3 rounded-2xl rounded-tl-sm text-left w-fit hover:brightness-95 transition"
+                  className="bg-brand-yellow text-gray-900 text-sm px-4 py-3 rounded-md rounded-tl-sm text-left w-fit hover:brightness-95 transition"
                 >
                   <p className="font-medium">{msg.content}</p>
                   <p className="text-xs mt-0.5 underline">Click here for details →</p>
                 </button>
               ) : (
-                <div className="bg-brand-yellow text-gray-900 text-sm px-4 py-3 rounded-2xl rounded-tl-sm w-fit">
+                <div className="bg-brand-yellow text-gray-900 text-sm px-4 py-3 rounded-md rounded-tl-sm w-fit">
                   <p className="font-medium">{msg.content}</p>
                   <p className="text-xs mt-0.5 text-gray-700">Referral shared by your navigator</p>
                 </div>
@@ -266,7 +262,7 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
       if (msg.role === "user") {
         return (
           <div key={msg.id} className="flex flex-col items-end mb-3 max-w-[80%] ml-auto">
-            <div className="bg-brand-yellow text-gray-900 text-sm px-4 py-2.5 rounded-2xl rounded-br-sm w-fit">
+            <div className="bg-brand-yellow text-gray-900 text-sm px-4 py-2.5 rounded-md rounded-br-sm w-fit">
               {msg.content}
             </div>
             {ts && <span className="text-[10px] text-gray-400 mt-1 mr-1">{ts}</span>}
@@ -285,7 +281,7 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
             <div className="w-10 flex-shrink-0" />
           )}
           <div className="flex flex-col">
-            <div className="bg-white text-gray-900 text-sm px-4 py-2.5 rounded-2xl rounded-tl-sm shadow-sm w-fit">
+            <div className="bg-white text-gray-900 text-sm px-4 py-2.5 rounded-md rounded-tl-sm shadow-sm w-fit">
               {msg.content}
             </div>
             {ts && <span className="text-[10px] text-gray-400 mt-1 ml-1">{ts}</span>}
@@ -322,7 +318,7 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
         {isTyping && (
           <div className="flex gap-3 mb-2">
             <div className="w-10 h-10 rounded-full bg-gray-300 flex-shrink-0" />
-            <div className="bg-white px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm flex gap-1 items-center">
+            <div className="bg-white px-4 py-3 rounded-md rounded-tl-sm shadow-sm flex gap-1 items-center">
               <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce typing-dot-1" />
               <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce typing-dot-2" />
               <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce typing-dot-3" />
@@ -336,7 +332,7 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
       {chatState === "greeting" && (
         <div className="px-4 pb-3 flex flex-wrap gap-2 flex-shrink-0">
           {QUICK_REPLIES.map((chip) => (
-            <button type="button" key={chip} onClick={() => handleQuickReply(chip)} className="border border-brand-yellow text-gray-900 text-sm px-4 py-2 rounded-xl hover:bg-brand-yellow/10 transition">
+            <button type="button" key={chip} onClick={() => handleQuickReply(chip)} className="border border-brand-yellow text-gray-900 text-sm px-4 py-2 rounded-md hover:bg-brand-yellow/10 transition">
               {chip}
             </button>
           ))}
@@ -350,7 +346,7 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
           <button
             type="button"
             onClick={handleStartNewChat}
-            className="inline-block bg-brand-yellow text-gray-900 text-sm font-medium px-5 py-2 rounded-xl hover:brightness-95 transition"
+            className="inline-block bg-brand-yellow text-gray-900 text-sm font-medium px-5 py-2 rounded-md hover:brightness-95 transition"
           >
             Start New Chat
           </button>

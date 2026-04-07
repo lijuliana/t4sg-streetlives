@@ -25,7 +25,7 @@ export default function NavigatorDashboardPage() {
   return (
     <DashboardShell title="My Sessions" role="navigator">
       {/* Summary strip */}
-      <div className="flex gap-4 bg-white border border-gray-200 rounded-xl px-5 py-4">
+      <div className="flex gap-4 bg-white border border-gray-200 rounded-md px-5 py-4">
         <div className="flex-1 text-center">
           <p className="text-2xl font-normal text-gray-900">{activeCount}</p>
           <p className="text-xs text-green-600 font-medium mt-0.5">Active</p>
@@ -48,7 +48,7 @@ export default function NavigatorDashboardPage() {
           Active
         </h2>
         {active.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center">
+          <div className="bg-white border border-gray-200 rounded-md px-5 py-8 text-center">
             <p className="text-sm text-gray-400">No active sessions</p>
           </div>
         ) : (
@@ -66,7 +66,7 @@ export default function NavigatorDashboardPage() {
           New Requests
         </h2>
         {newRequests.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center">
+          <div className="bg-white border border-gray-200 rounded-md px-5 py-8 text-center">
             <p className="text-sm text-gray-400">No new requests</p>
           </div>
         ) : (
@@ -84,7 +84,7 @@ export default function NavigatorDashboardPage() {
           Past Sessions
         </h2>
         {past.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center">
+          <div className="bg-white border border-gray-200 rounded-md px-5 py-8 text-center">
             <p className="text-sm text-gray-400">No closed sessions yet</p>
           </div>
         ) : (

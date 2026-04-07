@@ -107,7 +107,7 @@ export default function NavigatorSessionDetailPage() {
         <button
           type="button"
           onClick={() => router.push(`/dashboard/navigator/${sessionId}/chat`)}
-          className="flex items-center gap-1.5 text-xs font-medium bg-brand-yellow text-gray-900 px-3 py-1.5 rounded-lg hover:brightness-95 transition"
+          className="flex items-center gap-1.5 text-xs font-medium bg-brand-yellow text-gray-900 px-3 py-1.5 rounded-md hover:brightness-95 transition"
         >
           <MessageSquare size={13} strokeWidth={2} />
           {isSupervisor ? "Transcript" : "Open Chat"}
@@ -120,7 +120,7 @@ export default function NavigatorSessionDetailPage() {
       }
     >
       {/* Session header */}
-      <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-3">
+      <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 flex-wrap">
             {session.topics.map((t) => (
@@ -157,7 +157,7 @@ export default function NavigatorSessionDetailPage() {
             assignSession(session.id, DEMO_NAVIGATOR_ID);
             toast.success("Session accepted");
           }}
-          className="w-full bg-brand-yellow text-gray-900 text-sm font-medium py-2.5 rounded-xl hover:brightness-95 transition"
+          className="w-full bg-brand-yellow text-gray-900 text-sm font-medium py-2.5 rounded-md hover:brightness-95 transition"
         >
           Accept Session
         </button>
@@ -165,7 +165,7 @@ export default function NavigatorSessionDetailPage() {
 
       {/* Assign to… — unassigned + supervisor role */}
       {isUnassigned && isSupervisor && (
-        <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-2">
+        <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-2">
           <p className="text-xs font-normal text-gray-500 uppercase tracking-wide">Assign to Navigator</p>
           <select
             aria-label="Assign to navigator"
@@ -176,7 +176,7 @@ export default function NavigatorSessionDetailPage() {
                 toast.success("Session assigned");
               }
             }}
-            className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
+            className="w-full text-sm border border-gray-200 rounded-md px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
           >
             <option value="" disabled>Select a navigator…</option>
             {navigators.map((n) => (
@@ -188,7 +188,7 @@ export default function NavigatorSessionDetailPage() {
 
       {/* Transfer + Re-run routing — supervisor only */}
       {!isClosed && !isUnassigned && isSupervisor && (
-        <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-3">
+        <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-3">
           <p className="text-xs font-normal text-gray-500 uppercase tracking-wide">Routing</p>
           <div className="flex gap-2">
             <select
@@ -197,7 +197,7 @@ export default function NavigatorSessionDetailPage() {
               onChange={(e) => {
                 if (e.target.value) transferSession(session.id, e.target.value);
               }}
-              className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
+              className="flex-1 text-sm border border-gray-200 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
             >
               <option value="" disabled>Transfer to…</option>
               {otherNavigators.map((n) => (
@@ -207,7 +207,7 @@ export default function NavigatorSessionDetailPage() {
             <button
               type="button"
               onClick={() => rerouteSession(session.id)}
-              className="text-xs font-medium text-gray-700 border border-gray-200 px-3 py-2 rounded-xl hover:bg-gray-50 transition whitespace-nowrap"
+              className="text-xs font-medium text-gray-700 border border-gray-200 px-3 py-2 rounded-md hover:bg-gray-50 transition whitespace-nowrap"
             >
               Re-run Routing
             </button>
@@ -221,7 +221,7 @@ export default function NavigatorSessionDetailPage() {
           <button
             type="button"
             onClick={() => setShowCloseConfirm(true)}
-            className="flex-1 bg-gray-900 text-white text-sm font-medium py-2.5 rounded-xl hover:bg-gray-800 transition"
+            className="flex-1 bg-gray-900 text-white text-sm font-medium py-2.5 rounded-md hover:bg-gray-800 transition"
           >
             Close Session
           </button>
@@ -230,7 +230,7 @@ export default function NavigatorSessionDetailPage() {
 
       {/* Wrap-up form */}
       {showCloseConfirm && (
-        <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-4">
+        <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-4">
           <p className="text-sm font-medium text-gray-900">Close this session?</p>
 
           {/* Outcome checkboxes */}
@@ -271,7 +271,7 @@ export default function NavigatorSessionDetailPage() {
               onChange={(e) => setWrapNotes(e.target.value)}
               rows={3}
               placeholder="Session notes (optional)..."
-              className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow placeholder-gray-400 resize-none"
+              className="w-full text-sm border border-gray-200 rounded-md px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow placeholder-gray-400 resize-none"
             />
           </div>
 
@@ -292,7 +292,7 @@ export default function NavigatorSessionDetailPage() {
                 aria-label="Follow-up date"
                 value={wrapFollowUpDate}
                 onChange={(e) => setWrapFollowUpDate(e.target.value)}
-                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow"
+                className="w-full text-sm border border-gray-200 rounded-md px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow"
               />
             )}
           </div>
@@ -301,7 +301,7 @@ export default function NavigatorSessionDetailPage() {
             <button
               type="button"
               onClick={() => setShowCloseConfirm(false)}
-              className="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-50 transition"
+              className="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2.5 rounded-md hover:bg-gray-50 transition"
             >
               Cancel
             </button>
@@ -309,7 +309,7 @@ export default function NavigatorSessionDetailPage() {
               type="button"
               onClick={handleClose}
               disabled={!wrapOutcomeValid}
-              className="flex-1 bg-brand-yellow text-gray-900 text-sm font-medium py-2.5 rounded-xl hover:brightness-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex-1 bg-brand-yellow text-gray-900 text-sm font-medium py-2.5 rounded-md hover:brightness-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Close & Submit for Review
             </button>
@@ -323,7 +323,7 @@ export default function NavigatorSessionDetailPage() {
           <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-2">
             Outcome Log
           </h2>
-          <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-3">
+          <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-3">
             <div className="flex flex-wrap gap-2">
               {session.sessionLog.outcome.map((o) => (
                 <span key={o} className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full capitalize">
@@ -362,7 +362,7 @@ export default function NavigatorSessionDetailPage() {
             Session Notes
           </h2>
           {isClosed || isSupervisor ? (
-            <div className="bg-white border border-gray-200 rounded-xl px-5 py-4">
+            <div className="bg-white border border-gray-200 rounded-md px-5 py-4">
               {session.summary ? (
                 <p className="text-sm text-gray-700">{session.summary}</p>
               ) : (
@@ -380,7 +380,7 @@ export default function NavigatorSessionDetailPage() {
               }}
               rows={3}
               placeholder="Add session notes..."
-              className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow placeholder-gray-400 resize-none bg-white"
+              className="w-full text-sm border border-gray-200 rounded-md px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow placeholder-gray-400 resize-none bg-white"
             />
           )}
         </div>
@@ -396,7 +396,7 @@ export default function NavigatorSessionDetailPage() {
             <button
               type="button"
               onClick={() => setReferralOpen(true)}
-              className="flex items-center gap-1 text-xs font-medium text-gray-900 bg-brand-yellow px-3 py-1.5 rounded-lg hover:brightness-95 transition"
+              className="flex items-center gap-1 text-xs font-medium text-gray-900 bg-brand-yellow px-3 py-1.5 rounded-md hover:brightness-95 transition"
             >
               <Plus size={13} strokeWidth={2.5} />
               Add Referral
@@ -404,7 +404,7 @@ export default function NavigatorSessionDetailPage() {
           )}
         </div>
         {session.referrals.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl px-5 py-6 text-center">
+          <div className="bg-white border border-gray-200 rounded-md px-5 py-6 text-center">
             <p className="text-sm text-gray-400">No referrals yet</p>
             {!isClosed && !isSupervisor && isMySession && (
               <button
@@ -430,7 +430,7 @@ export default function NavigatorSessionDetailPage() {
         <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">
           Timeline
         </h2>
-        <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-3">
+        <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-3">
           {session.events.length === 0 ? (
             <p className="text-sm text-gray-400">No events recorded.</p>
           ) : (
@@ -456,13 +456,13 @@ export default function NavigatorSessionDetailPage() {
       {!isSupervisor && isClosed && session.logged && (
         <div>
           {session.reviewStatus === "returned" && (
-            <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-3 space-y-1">
+            <div className="bg-red-50 border border-red-200 rounded-md px-5 py-3 space-y-1">
               <p className="text-xs font-medium text-red-600">Returned by supervisor</p>
               <p className="text-sm text-red-700">{session.supervisorReturnNote}</p>
             </div>
           )}
           {session.reviewStatus === "approved" && (
-            <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-3 text-center">
+            <div className="bg-green-50 border border-green-200 rounded-md px-5 py-3 text-center">
               <p className="text-xs font-medium text-green-600">
                 Approved by supervisor{session.reviewedAt ? ` · ${moment(session.reviewedAt).format("MMM D, YYYY")}` : ""}
               </p>
@@ -472,7 +472,7 @@ export default function NavigatorSessionDetailPage() {
             </div>
           )}
           {session.reviewStatus === "submitted" && (
-            <div className="bg-white border border-gray-200 rounded-xl px-5 py-3 text-center">
+            <div className="bg-white border border-gray-200 rounded-md px-5 py-3 text-center">
               <p className="text-xs text-gray-400">Awaiting supervisor review</p>
             </div>
           )}
@@ -485,27 +485,27 @@ export default function NavigatorSessionDetailPage() {
           <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-2">
             Supervisor Review
           </h2>
-          <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-3">
+          <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-3">
             <textarea
               value={coachingNote}
               onChange={(e) => setCoachingNote(e.target.value)}
               rows={3}
               placeholder="Coaching notes (optional for approval, required to return)..."
-              className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow placeholder-gray-400 resize-none"
+              className="w-full text-sm border border-gray-200 rounded-md px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow placeholder-gray-400 resize-none"
             />
             <div className="flex gap-2">
               <button
                 type="button"
                 disabled={!coachingNote.trim()}
                 onClick={() => { returnSession(session.id, coachingNote); toast.success("Returned to navigator"); }}
-                className="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-50 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2.5 rounded-md hover:bg-gray-50 transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Return to Navigator
               </button>
               <button
                 type="button"
                 onClick={() => { approveSession(session.id, coachingNote); toast.success("Session approved"); }}
-                className="flex-1 bg-brand-yellow text-gray-900 text-sm font-medium py-2.5 rounded-xl hover:brightness-95 transition"
+                className="flex-1 bg-brand-yellow text-gray-900 text-sm font-medium py-2.5 rounded-md hover:brightness-95 transition"
               >
                 Approve
               </button>
@@ -520,7 +520,7 @@ export default function NavigatorSessionDetailPage() {
           <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-2">
             Supervisor Review
           </h2>
-          <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-2">
+          <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-2">
             {session.reviewStatus === "approved" ? (
               <p className="text-xs text-green-600 font-medium" suppressHydrationWarning>
                 Approved{session.reviewedAt ? ` · ${moment(session.reviewedAt).format("MMM D, YYYY [at] h:mm A")}` : ""}

@@ -49,14 +49,14 @@ export default async function HomePage() {
         {dashboard ? (
           <Link
             href={dashboard.href}
-            className="mt-6 inline-block bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-lg hover:opacity-90 transition"
+            className="mt-6 inline-block bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-md hover:opacity-90 transition"
           >
             {dashboard.label}
           </Link>
         ) : (
           <button
             type="button"
-            className="mt-6 bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-lg hover:opacity-90 transition"
+            className="mt-6 bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-md hover:opacity-90 transition"
           >
             Get started below
           </button>
@@ -112,7 +112,7 @@ export default async function HomePage() {
         </p>
         <button
           type="button"
-          className="mt-6 bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-lg hover:opacity-90 transition"
+          className="mt-6 bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-md hover:opacity-90 transition"
         >
           Learn from Peers
         </button>
@@ -135,7 +135,7 @@ export default async function HomePage() {
         </p>
         <Link
           href="#"
-          className="mt-6 inline-block bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-lg hover:opacity-90 transition"
+          className="mt-6 inline-block bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-md hover:opacity-90 transition"
         >
           Sign into Provider Portal
         </Link>

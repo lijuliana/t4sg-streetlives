@@ -96,7 +96,7 @@ export default function ReferralForm({ sessionId, open, onClose }: Props) {
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50" />
-        <Dialog.Content className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl shadow-xl p-6 focus:outline-none">
+        <Dialog.Content className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-md shadow-xl p-6 focus:outline-none">
           <div className="flex items-center justify-between mb-5">
             <Dialog.Title className="text-base font-normal text-gray-900">
               Create Referral
@@ -116,7 +116,7 @@ export default function ReferralForm({ sessionId, open, onClose }: Props) {
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setSelectedService(null); }}
                 placeholder="Search for services..."
-                className="w-full text-sm border border-gray-200 rounded-xl pl-3 pr-9 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow placeholder-gray-400"
+                className="w-full text-sm border border-gray-200 rounded-md pl-3 pr-9 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow placeholder-gray-400"
               />
               <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             </div>
@@ -129,7 +129,7 @@ export default function ReferralForm({ sessionId, open, onClose }: Props) {
                   aria-label="Filter by location"
                   value={locationFilter}
                   onChange={(e) => { setLocationFilter(e.target.value); setSelectedService(null); }}
-                  className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
+                  className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
                 >
                   <option value="all">All neighborhoods</option>
                   {neighborhoods.filter((n) => n !== "all").map((n) => (
@@ -143,7 +143,7 @@ export default function ReferralForm({ sessionId, open, onClose }: Props) {
                   aria-label="Filter by category"
                   value={categoryFilter}
                   onChange={(e) => { setCategoryFilter(e.target.value as ReferralCategory | "all"); setSelectedService(null); }}
-                  className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
+                  className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
                 >
                   <option value="all">All categories</option>
                   {REFERRAL_CATEGORIES.map((c) => (
@@ -158,7 +158,7 @@ export default function ReferralForm({ sessionId, open, onClose }: Props) {
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
                 Results {filtered.length > 0 && `(${filtered.length})`}
               </p>
-              <div className="max-h-44 overflow-y-auto space-y-1.5 rounded-xl border border-gray-200 p-2">
+              <div className="max-h-44 overflow-y-auto space-y-1.5 rounded-md border border-gray-200 p-2">
                 {filtered.length === 0 ? (
                   <p className="text-sm text-gray-400 text-center py-4">No services match your filters</p>
                 ) : (
@@ -168,7 +168,7 @@ export default function ReferralForm({ sessionId, open, onClose }: Props) {
                       type="button"
                       onClick={() => setSelectedService(service)}
                       className={cn(
-                        "w-full text-left px-3 py-2.5 rounded-lg border transition",
+                        "w-full text-left px-3 py-2.5 rounded-md border transition",
                         selectedService?.id === service.id
                           ? "border-brand-yellow bg-brand-yellow/10"
                           : "border-transparent hover:bg-gray-50"
@@ -187,7 +187,7 @@ export default function ReferralForm({ sessionId, open, onClose }: Props) {
               <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
               <select
                 {...register("status")}
-                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
+                className="w-full text-sm border border-gray-200 rounded-md px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
               >
                 {REFERRAL_STATUSES.map((s) => (
                   <option key={s} value={s}>{REFERRAL_STATUS_LABELS[s]}</option>
@@ -204,14 +204,14 @@ export default function ReferralForm({ sessionId, open, onClose }: Props) {
                 {...register("notes")}
                 rows={2}
                 placeholder="Any details the client should know..."
-                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow placeholder-gray-400 resize-none"
+                className="w-full text-sm border border-gray-200 rounded-md px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow placeholder-gray-400 resize-none"
               />
             </div>
 
             <button
               type="submit"
               disabled={!selectedService}
-              className="w-full bg-brand-yellow text-gray-900 font-medium text-sm py-3 rounded-xl hover:brightness-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full bg-brand-yellow text-gray-900 font-medium text-sm py-3 rounded-md hover:brightness-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Send to Chat
             </button>

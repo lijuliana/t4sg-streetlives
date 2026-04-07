@@ -31,11 +31,11 @@ export default function UserDashboardPage() {
           Current Session
         </h2>
         {active.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center space-y-3">
+          <div className="bg-white border border-gray-200 rounded-md px-5 py-8 text-center space-y-3">
             <p className="text-sm text-gray-500">You don&apos;t have an active session.</p>
             <Link
               href="/chat"
-              className="inline-block bg-brand-yellow text-gray-900 text-sm font-medium px-5 py-2.5 rounded-xl hover:brightness-95 transition"
+              className="inline-block bg-brand-yellow text-gray-900 text-sm font-medium px-5 py-2.5 rounded-md hover:brightness-95 transition"
             >
               Chat with a Peer Navigator
             </Link>
@@ -45,7 +45,7 @@ export default function UserDashboardPage() {
             {active.map((session) => {
               const initials = session.navigatorName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
               return (
-                <div key={session.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                <div key={session.id} className="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
                   {/* Session info row — taps to session detail */}
                   <button
                     type="button"
@@ -77,7 +77,7 @@ export default function UserDashboardPage() {
                   <div className="px-4 pb-3 border-t border-gray-100 pt-2">
                     <Link
                       href="/"
-                      className="flex items-center justify-center w-full bg-brand-yellow text-gray-900 text-sm font-medium py-2.5 rounded-xl hover:brightness-95 transition"
+                      className="flex items-center justify-center w-full bg-brand-yellow text-gray-900 text-sm font-medium py-2.5 rounded-md hover:brightness-95 transition"
                     >
                       Continue Chat
                     </Link>
@@ -95,7 +95,7 @@ export default function UserDashboardPage() {
           Past Sessions
         </h2>
         {past.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center">
+          <div className="bg-white border border-gray-200 rounded-md px-5 py-8 text-center">
             <p className="text-sm text-gray-400">No past sessions yet</p>
           </div>
         ) : (

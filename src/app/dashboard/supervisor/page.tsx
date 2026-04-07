@@ -37,7 +37,7 @@ function NavigatorRow({ navigator }: { navigator: Navigator }) {
   const hasSubmitted = sessions.some((s) => s.reviewStatus === "submitted");
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
@@ -129,15 +129,15 @@ export default function SupervisorDashboardPage() {
     <DashboardShell title="Sessions" role="supervisor">
       {/* Metrics grid */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-4 text-center">
+        <div className="bg-white border border-gray-200 rounded-md px-4 py-4 text-center">
           <p className="text-3xl font-normal text-gray-900">{totalSessions}</p>
           <p className="text-xs text-gray-500 mt-1">Total Sessions</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-4 text-center">
+        <div className="bg-white border border-gray-200 rounded-md px-4 py-4 text-center">
           <p className="text-3xl font-normal text-green-700">{activeNow}</p>
           <p className="text-xs text-gray-500 mt-1">Active</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-4 text-center">
+        <div className="bg-white border border-gray-200 rounded-md px-4 py-4 text-center">
           <p className={`text-3xl font-normal ${newRequests > 0 ? "text-amber-600" : "text-gray-900"}`}>
             {newRequests}
           </p>
@@ -145,11 +145,11 @@ export default function SupervisorDashboardPage() {
             New Requests
           </p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-4 text-center">
+        <div className="bg-white border border-gray-200 rounded-md px-4 py-4 text-center">
           <p className="text-3xl font-normal text-blue-600">{totalReferrals}</p>
           <p className="text-xs text-gray-500 mt-1">Total Referrals</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-4 text-center">
+        <div className="bg-white border border-gray-200 rounded-md px-4 py-4 text-center">
           <p className={`text-3xl font-normal ${awaitingReview > 0 ? "text-amber-600" : "text-gray-900"}`}>{awaitingReview}</p>
           <p className={`text-xs mt-1 ${awaitingReview > 0 ? "text-amber-600 font-medium" : "text-gray-500"}`}>Awaiting Review</p>
         </div>

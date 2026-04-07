@@ -110,13 +110,13 @@ export default function NavigatorChatPage() {
               <button
                 type="button"
                 onClick={() => router.push(`/services/${msg.serviceId}`)}
-                className="bg-brand-yellow text-gray-900 text-sm px-4 py-3 rounded-2xl rounded-br-sm text-left w-fit hover:brightness-95 transition"
+                className="bg-brand-yellow text-gray-900 text-sm px-4 py-3 rounded-md rounded-br-sm text-left w-fit hover:brightness-95 transition"
               >
                 <p className="font-medium">{msg.content}</p>
                 <p className="text-xs mt-0.5 underline">Click here for details →</p>
               </button>
             ) : (
-              <div className="bg-brand-yellow text-gray-900 text-sm px-4 py-3 rounded-2xl rounded-br-sm w-fit">
+              <div className="bg-brand-yellow text-gray-900 text-sm px-4 py-3 rounded-md rounded-br-sm w-fit">
                 <p className="font-medium">{msg.content}</p>
                 <p className="text-xs mt-0.5 text-gray-700">Referral shared</p>
               </div>
@@ -133,7 +133,7 @@ export default function NavigatorChatPage() {
           <div key={msg.id} className="flex flex-col items-end mb-3 max-w-[80%] ml-auto">
             <div
               className={cn(
-                "text-sm px-4 py-2.5 rounded-2xl rounded-br-sm w-fit",
+                "text-sm px-4 py-2.5 rounded-md rounded-br-sm w-fit",
                 isNavigator
                   ? "bg-brand-yellow text-gray-900"
                   : "bg-gray-200 text-gray-700"
@@ -153,7 +153,7 @@ export default function NavigatorChatPage() {
         <div key={msg.id} className={cn("flex gap-3 mb-3 max-w-[80%]", !showAvatar && "pl-13")}>
           {showAvatar ? <UserAvatar /> : <div className="w-10 flex-shrink-0" />}
           <div className="flex flex-col">
-            <div className="bg-white text-gray-900 text-sm px-4 py-2.5 rounded-2xl rounded-tl-sm shadow-sm w-fit">
+            <div className="bg-white text-gray-900 text-sm px-4 py-2.5 rounded-md rounded-tl-sm shadow-sm w-fit">
               {msg.content}
             </div>
             <span className="text-[10px] text-gray-400 mt-1 ml-1">{ts}</span>
@@ -199,10 +199,10 @@ export default function NavigatorChatPage() {
       {showEndConfirm && (
         <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 flex-shrink-0">
           <p className="text-sm text-gray-700 flex-1">End this session?</p>
-          <button type="button" onClick={() => setShowEndConfirm(false)} className="text-xs text-gray-500 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
+          <button type="button" onClick={() => setShowEndConfirm(false)} className="text-xs text-gray-500 px-3 py-1.5 rounded-md border border-gray-200 hover:bg-gray-50 transition">
             Cancel
           </button>
-          <button type="button" onClick={handleEndSession} className="text-xs font-medium text-gray-900 px-3 py-1.5 rounded-lg bg-brand-yellow hover:brightness-95 transition">
+          <button type="button" onClick={handleEndSession} className="text-xs font-medium text-gray-900 px-3 py-1.5 rounded-md bg-brand-yellow hover:brightness-95 transition">
             Confirm End
           </button>
         </div>

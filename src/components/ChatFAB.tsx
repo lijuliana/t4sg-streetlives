@@ -7,7 +7,7 @@ import { X } from "lucide-react";
 import { ChatContent } from "@/app/chat/page";
 
 export default function ChatFAB() {
-  const [isDesktop, setIsDesktop] = useState(false);
+  const [isDesktop, setIsDesktop] = useState<boolean | null>(null);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -16,6 +16,9 @@ export default function ChatFAB() {
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
+
+  // Don't render until we know the screen size — prevents flash of wrong version on first load
+  if (isDesktop === null) return null;
 
   if (!isDesktop) {
     return (
@@ -33,7 +36,7 @@ export default function ChatFAB() {
     <>
       {/* Desktop floating panel */}
       {open && (
-        <div className="fixed bottom-24 right-6 w-[480px] h-[700px] rounded-2xl shadow-2xl overflow-hidden z-50 border border-gray-200">
+        <div className="fixed bottom-24 right-6 w-[480px] h-[700px] rounded-md shadow-2xl overflow-hidden z-50 border border-gray-200">
           <ChatContent onClose={() => setOpen(false)} />
         </div>
       )}

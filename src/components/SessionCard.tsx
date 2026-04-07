@@ -44,7 +44,7 @@ export default function SessionCard({ session, viewerRole, index = 0 }: Props) {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay: index * 0.05 }}
-      className="w-full text-left bg-white border border-gray-200 rounded-xl shadow-sm px-4 py-3.5 flex items-center gap-3 hover:border-gray-300 hover:shadow-md transition"
+      className="w-full text-left bg-white border border-gray-200 rounded-md shadow-sm px-4 py-3.5 flex items-center gap-3 hover:border-gray-300 hover:shadow-md transition"
     >
       {/* Avatar — gray silhouette for navigator/supervisor (anonymous), yellow with initials for user view */}
       {(isUnassigned || viewerRole === "navigator" || viewerRole === "supervisor") ? (
