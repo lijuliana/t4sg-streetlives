@@ -19,8 +19,15 @@ function loadBarClass(active: number, capacity: number): string {
   return "w-1/12";
 }
 
-function NavigatorRow({ navigator }: { navigator: Navigator }) {
-  const [expanded, setExpanded] = useState(false);
+function NavigatorRow({
+  navigator,
+  expanded,
+  onToggle,
+}: {
+  navigator: Navigator;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
   const allSessions = useStore((s) => s.sessions);
   const sessions = allSessions
     .filter((s) => s.navigatorId === navigator.id)
@@ -40,7 +47,7 @@ function NavigatorRow({ navigator }: { navigator: Navigator }) {
     <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
       <button
         type="button"
-        onClick={() => setExpanded(!expanded)}
+        onClick={onToggle}
         className="w-full flex items-center gap-3 px-5 py-4 hover:bg-gray-50 transition text-left"
       >
         {/* Avatar */}
@@ -93,7 +100,6 @@ function NavigatorRow({ navigator }: { navigator: Navigator }) {
               key={session.id}
               session={session}
               viewerRole="supervisor"
-              index={i}
             />
           ))}
         </div>
@@ -111,6 +117,7 @@ function NavigatorRow({ navigator }: { navigator: Navigator }) {
 export default function SupervisorDashboardPage() {
   const sessions = useStore((s) => s.sessions);
   const navigators = useStore((s) => s.navigators);
+  const [expandedNavId, setExpandedNavId] = useState<string | null>(null);
 
   const today = moment().startOf("day");
 
@@ -162,7 +169,12 @@ export default function SupervisorDashboardPage() {
         </h2>
         <div className="space-y-2">
           {navigators.map((nav) => (
-            <NavigatorRow key={nav.id} navigator={nav} />
+            <NavigatorRow
+              key={nav.id}
+              navigator={nav}
+              expanded={expandedNavId === nav.id}
+              onToggle={() => setExpandedNavId(expandedNavId === nav.id ? null : nav.id)}
+            />
           ))}
         </div>
       </section>

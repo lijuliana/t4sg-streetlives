@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import moment from "moment";
 import SessionStatusBadge from "./SessionStatusBadge";
@@ -9,14 +8,15 @@ import type { Session, AppRole } from "@/lib/store";
 interface Props {
   session: Session;
   viewerRole: AppRole;
-  index?: number;
 }
 
-export default function SessionCard({ session, viewerRole, index = 0 }: Props) {
+export default function SessionCard({ session, viewerRole }: Props) {
   const router = useRouter();
 
   const href =
-    viewerRole === "navigator" || viewerRole === "supervisor"
+    viewerRole === "supervisor"
+      ? `/dashboard/supervisor/${session.id}`
+      : viewerRole === "navigator"
       ? `/dashboard/navigator/${session.id}`
       : `/dashboard/user/${session.id}`;
 
@@ -38,12 +38,9 @@ export default function SessionCard({ session, viewerRole, index = 0 }: Props) {
       .slice(0, 2);
 
   return (
-    <motion.button
+    <button
       type="button"
       onClick={() => router.push(href)}
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, delay: index * 0.05 }}
       className="w-full text-left bg-white border border-gray-200 rounded-md shadow-sm px-4 py-3.5 flex items-center gap-3 hover:border-gray-300 hover:shadow-md transition"
     >
       {/* Avatar — gray silhouette for navigator/supervisor (anonymous), yellow with initials for user view */}
@@ -95,6 +92,6 @@ export default function SessionCard({ session, viewerRole, index = 0 }: Props) {
 
       {/* Badge */}
       <SessionStatusBadge status={session.status} size="sm" />
-    </motion.button>
+    </button>
   );
 }

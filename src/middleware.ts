@@ -15,11 +15,20 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Role-protected routes
+  // Role-protected routes — run auth0 middleware first so it can refresh
+  // the access token before we try to read the session/roles.
   if (
     pathname.startsWith("/dashboard/navigator") ||
-    pathname.startsWith("/dashboard/supervisor")
+    pathname.startsWith("/dashboard/supervisor") ||
+    pathname.startsWith("/dashboard/user")
   ) {
+    const authRes = await auth0.middleware(request);
+
+    // auth0 returned a redirect (e.g. session expired → login page) — follow it
+    if (authRes.status !== 200) {
+      return authRes;
+    }
+
     const session = await auth0.getSession(request);
 
     if (!session) {
@@ -38,7 +47,12 @@ export async function middleware(request: NextRequest) {
       return new NextResponse("Forbidden", { status: 403 });
     }
 
-    return await auth0.middleware(request);
+    if (pathname.startsWith("/dashboard/user") && (roles.includes("navigator") || roles.includes("supervisor"))) {
+      return new NextResponse("Forbidden", { status: 403 });
+    }
+
+    // Return auth0's response so any refreshed-token cookies are sent to the client
+    return authRes;
   }
 
   return await auth0.middleware(request);

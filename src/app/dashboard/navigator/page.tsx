@@ -54,7 +54,7 @@ export default function NavigatorDashboardPage() {
         ) : (
           <div className="space-y-2">
             {active.map((session, i) => (
-              <SessionCard key={session.id} session={session} viewerRole="navigator" index={i} />
+              <SessionCard key={session.id} session={session} viewerRole="navigator" />
             ))}
           </div>
         )}
@@ -72,7 +72,7 @@ export default function NavigatorDashboardPage() {
         ) : (
           <div className="space-y-2">
             {newRequests.map((session, i) => (
-              <SessionCard key={session.id} session={session} viewerRole="navigator" index={i} />
+              <SessionCard key={session.id} session={session} viewerRole="navigator" />
             ))}
           </div>
         )}
@@ -90,7 +90,7 @@ export default function NavigatorDashboardPage() {
         ) : (
           <div className="space-y-2">
             {past.map((session, i) => (
-              <SessionCard key={session.id} session={session} viewerRole="navigator" index={i} />
+              <SessionCard key={session.id} session={session} viewerRole="navigator" />
             ))}
           </div>
         )}

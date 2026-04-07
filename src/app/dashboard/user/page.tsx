@@ -105,7 +105,6 @@ export default function UserDashboardPage() {
                 key={session.id}
                 session={session}
                 viewerRole="user"
-                index={i}
               />
             ))}
           </div>
