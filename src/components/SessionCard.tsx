@@ -8,9 +8,12 @@ import type { Session, AppRole } from "@/lib/store";
 interface Props {
   session: Session;
   viewerRole: AppRole;
+  onSelect?: (sessionId: string) => void;
+  selected?: boolean;
+  urgent24h?: boolean;
 }
 
-export default function SessionCard({ session, viewerRole }: Props) {
+export default function SessionCard({ session, viewerRole, onSelect, selected, urgent24h }: Props) {
   const router = useRouter();
 
   const href =
@@ -40,8 +43,8 @@ export default function SessionCard({ session, viewerRole }: Props) {
   return (
     <button
       type="button"
-      onClick={() => router.push(href)}
-      className="w-full text-left bg-white border border-gray-200 rounded-md shadow-sm px-4 py-3.5 flex items-center gap-3 hover:border-gray-300 hover:shadow-md transition"
+      onClick={() => onSelect ? onSelect(session.id) : router.push(href)}
+      className={`w-full text-left bg-white border rounded-md shadow-sm px-4 py-3.5 flex items-center gap-3 hover:border-gray-300 hover:shadow-md transition ${selected ? "border-brand-yellow ring-1 ring-brand-yellow" : "border-gray-200"}`}
     >
       {/* Avatar — gray silhouette for navigator/supervisor (anonymous), yellow with initials for user view */}
       {(isUnassigned || viewerRole === "navigator" || viewerRole === "supervisor") ? (
@@ -69,6 +72,11 @@ export default function SessionCard({ session, viewerRole }: Props) {
               {t}
             </span>
           ))}
+          {urgent24h && viewerRole === "navigator" && (
+            <span className="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full font-medium">
+              ⚠ 24h
+            </span>
+          )}
           {awaitingReview && viewerRole === "supervisor" && (
             <span className="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full font-medium">
               Needs Review
@@ -79,7 +87,7 @@ export default function SessionCard({ session, viewerRole }: Props) {
               Returned
             </span>
           )}
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-gray-400" suppressHydrationWarning>
             {moment(session.startedAt).calendar(null, {
               sameDay: "[Today at] h:mm A",
               lastDay: "[Yesterday at] h:mm A",

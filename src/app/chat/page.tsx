@@ -40,14 +40,6 @@ interface LocalMessage {
   serviceId?: string;
 }
 
-const QUICK_REPLIES = [
-  "A place to sleep tonight",
-  "A job",
-  "A hot shower",
-  "Something to eat",
-  "Help with finding housing",
-];
-
 // Stable empty array to avoid selector infinite loop
 const EMPTY_MSGS: import("@/lib/store").ChatMessage[] = [];
 
@@ -187,22 +179,6 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
     },
     [addLocalMessage, createSession, seedChatMessages]
   );
-
-  const handleQuickReply = (chip: string) => {
-    if (chatState !== "greeting") return;
-    setChatState("user_replied");
-    setTopic(chip);
-    addLocalMessage({ role: "user", content: chip });
-    triggerNavigatorConnection(chip);
-  };
-
-  const handleLiveFAB = () => {
-    if (chatState === "connecting" || chatState === "live") return;
-    const t = topic || "general support";
-    setTopic(t);
-    setChatState("user_replied");
-    triggerNavigatorConnection(t);
-  };
 
   const handleSend = () => {
     const text = inputValue.trim();
@@ -418,17 +394,6 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
         )}
         <div ref={messagesEndRef} />
       </div>
-
-      {/* Quick reply chips */}
-      {chatState === "greeting" && (
-        <div className="px-4 pb-3 flex flex-wrap gap-2 flex-shrink-0">
-          {QUICK_REPLIES.map((chip) => (
-            <button type="button" key={chip} onClick={() => handleQuickReply(chip)} className="border border-brand-yellow text-gray-900 text-sm px-4 py-2 rounded-md hover:bg-brand-yellow/10 transition">
-              {chip}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* Closed session banner */}
       {isClosed ? (
