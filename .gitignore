@@ -21,3 +21,6 @@ node_modules/
 function.zip
 
 migration.sql
+
+# Claude Code
+.claude/

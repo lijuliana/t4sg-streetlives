@@ -1,0 +1,234 @@
+/* ── FullScreenShell ── */
+.fullScreenShell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* ── Card ── */
+.card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 36px 32px;
+  max-width: var(--card-max-width, 400px);
+  width: 100%;
+  box-shadow: 0 8px 48px rgba(0,0,0,0.5);
+}
+
+/* ── LandingScreen ── */
+.landingHeader {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.landingIcon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: #f5c800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  font-size: 26px;
+}
+
+.landingTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111;
+  margin-bottom: 10px;
+  letter-spacing: -0.02em;
+}
+
+.landingSubtitle {
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.primaryButton {
+  width: 100%;
+  padding: 13px;
+  border-radius: 10px;
+  border: none;
+  background: #f5c800;
+  color: #111;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+}
+
+.secondaryButton {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+}
+
+.sessionIdHint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #9ca3af;
+  text-align: center;
+}
+
+.privacyNote {
+  margin-top: 14px;
+  font-size: 12px;
+  color: #9ca3af;
+  text-align: center;
+}
+
+/* ── PreChatForm ── */
+.backButton {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.formTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111;
+  margin-bottom: 6px;
+  letter-spacing: -0.02em;
+}
+
+.formSubtitle {
+  font-size: 13px;
+  color: #6b7280;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.fieldStack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.selectLabel {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
+}
+
+.selectControl {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  font-size: 14px;
+  font-family: 'DM Sans', sans-serif;
+  background: #fff;
+  color: #111;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.submitButton {
+  width: 100%;
+  padding: 13px;
+  border-radius: 10px;
+  border: none;
+  background: #f5c800;
+  color: #111;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  margin-top: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.submitButton[data-starting="true"] {
+  background: #e5b800;
+  cursor: not-allowed;
+}
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0,0,0,0.2);
+  border-top-color: #111;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+/* ── AppLoadingScreen ── */
+.appSpinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #374151;
+  border-top-color: #f5c800;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ── AppErrorScreen ── */
+.errorTitle {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #111;
+}
+
+.errorMessage {
+  font-size: 13px;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+}
+
+.retryButton {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  background: #f5c800;
+  color: #111;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

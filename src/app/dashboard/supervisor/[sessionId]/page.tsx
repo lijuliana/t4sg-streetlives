@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { MessageSquare } from "lucide-react";
@@ -66,6 +66,8 @@ export default function SupervisorSessionDetailPage() {
 
   const session = getSessionById(sessionId);
   const [coachingNote, setCoachingNote] = useState(session?.supervisorNote ?? "");
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   if (!session) {
     return (
@@ -117,7 +119,7 @@ export default function SupervisorSessionDetailPage() {
             {session.navigatorId ? `Navigator: ${session.navigatorName}` : "Unassigned"}
           </p>
           <p suppressHydrationWarning>Started {moment(session.startedAt).format("MMM D, YYYY [at] h:mm A")}</p>
-          {session.closedAt && (
+          {mounted && session.closedAt && (
             <p suppressHydrationWarning>Closed {moment(session.closedAt).format("MMM D, YYYY [at] h:mm A")}</p>
           )}
         </div>

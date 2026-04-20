@@ -10,6 +10,28 @@ import type { ChatMessageRole } from "@/lib/store";
 
 type ChatState = "greeting" | "user_replied" | "connecting" | "live";
 
+const LANGUAGES = [
+  { value: "en", label: "English" },
+  { value: "es", label: "Spanish (Español)" },
+  { value: "zh", label: "Mandarin (中文)" },
+  { value: "fr", label: "French (Français)" },
+  { value: "ar", label: "Arabic (العربية)" },
+  { value: "ht", label: "Haitian Creole (Kreyòl ayisyen)" },
+];
+
+const NEED_CATEGORIES = [
+  "Accommodations",
+  "Food",
+  "Clothing",
+  "Personal Care",
+  "Health",
+  "Family Services",
+  "Work",
+  "Legal",
+  "Connection",
+  "Other",
+];
+
 interface LocalMessage {
   id: string;
   role: ChatMessageRole;
@@ -42,16 +64,6 @@ function mapTopicToCategory(text: string): string {
   return "Other";
 }
 
-const CATEGORY_PHRASES: Record<string, string> = {
-  Accommodations: "finding housing",
-  Food: "finding food",
-  Work: "finding work",
-  Health: "with your health needs",
-  Legal: "with a legal matter",
-  "Personal Care": "with personal care",
-  "Family Services": "with family support",
-  Other: "with what you need",
-};
 
 function BotAvatar() {
   return (
@@ -82,6 +94,10 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
   const addChatMessage = useStore((s) => s.addChatMessage);
   const seedChatMessages = useStore((s) => s.seedChatMessages);
 
+  const [showIntake, setShowIntake] = useState(true);
+  const [intakeLanguage, setIntakeLanguage] = useState("");
+  const [intakeCategory, setIntakeCategory] = useState("");
+
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [routedNavName, setRoutedNavName] = useState("Jenna Rivera");
 
@@ -90,6 +106,7 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
     activeSessionId ? s.sessions.find((sess) => sess.id === activeSessionId)?.status : undefined
   );
   const isClosed = sessionStatus === "closed";
+  const [confirmEnd, setConfirmEnd] = useState(false);
   const [chatState, setChatState] = useState<ChatState>("greeting");
   const [localMessages, setLocalMessages] = useState<LocalMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -132,14 +149,12 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
       if (session) {
         setActiveSessionId(storedId);
         setChatState("live");
+        setShowIntake(false);
         if (session.navigatorName) setRoutedNavName(session.navigatorName.split(" ")[0]);
         return;
       }
       sessionStorage.removeItem("chat_session_id");
     }
-
-    setTimeout(() => addLocalMessage({ role: "bot", content: "Hi, we're here to help guide you through this service" }), 300);
-    setTimeout(() => addLocalMessage({ role: "bot", content: "What can I help you with?" }), 750);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -153,38 +168,22 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
       const allSessions = useStore.getState().sessions;
       const routedNavId = routeSession(category, allNavigators, allSessions);
       const routedNav = allNavigators.find((n) => n.id === routedNavId) ?? allNavigators[0];
-      const phrase = CATEGORY_PHRASES[category] ?? "with what you need";
       setRoutedNavName(routedNav.name);
 
       setTimeout(() => setIsTyping(true), 400);
 
       setTimeout(() => {
         setIsTyping(false);
-        addLocalMessage({ role: "bot", content: "Thanks, let me connect you with a peer navigator to help you" });
+        addLocalMessage({ role: "navigator", content: `Hi, I'm ${routedNav.name}. Can you tell me a little more about what you need?` });
+        setChatState("live");
 
-        setTimeout(() => {
-          addLocalMessage({ role: "system", content: `You are being connected with ${routedNav.name.split(" ")[0]}` });
+        const newSession = createSession("user-1", "Jordan M.", routedNav.id, selectedTopic, true);
+        setActiveSessionId(newSession.id);
+        sessionStorage.setItem("chat_session_id", newSession.id);
+        seedChatMessages(newSession.id, localMessagesRef.current.map((m) => ({ role: m.role, content: m.content, serviceId: m.serviceId })));
 
-          setTimeout(() => setIsTyping(true), 600);
-
-          setTimeout(() => {
-            setIsTyping(false);
-            addLocalMessage({ role: "navigator", content: `Hi, I'm ${routedNav.name}. I see you need help ${phrase}.` });
-
-            setTimeout(() => {
-              addLocalMessage({ role: "navigator", content: "Can you tell me a little more about what you need?" });
-              setChatState("live");
-
-              const newSession = createSession("user-1", "Jordan M.", routedNav.id, selectedTopic, true);
-              setActiveSessionId(newSession.id);
-              sessionStorage.setItem("chat_session_id", newSession.id);
-              seedChatMessages(newSession.id, localMessagesRef.current.map((m) => ({ role: m.role, content: m.content, serviceId: m.serviceId })));
-
-              setTimeout(() => inputRef.current?.focus(), 100);
-            }, 800);
-          }, 1800);
-        }, 600);
-      }, 1000);
+        setTimeout(() => inputRef.current?.focus(), 100);
+      }, 1400);
     },
     [addLocalMessage, createSession, seedChatMessages]
   );
@@ -212,7 +211,18 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
     addChatMessage(activeSessionId, { role: "user", content: text });
   };
 
+  const handleIntakeSubmit = () => {
+    if (!intakeLanguage || !intakeCategory) return;
+    setShowIntake(false);
+    setTimeout(() => addLocalMessage({ role: "bot", content: "Hi, we're here to help guide you through this service" }), 300);
+    setTimeout(() => {
+      addLocalMessage({ role: "bot", content: `Connecting you with someone to help with ${intakeCategory.toLowerCase()}…` });
+      setTimeout(() => triggerNavigatorConnection(intakeCategory), 800);
+    }, 900);
+  };
+
   const handleEndChat = () => {
+    sessionStorage.removeItem("chat_session_id");
     if (onClose) onClose();
     else router.push("/");
   };
@@ -297,15 +307,91 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-100 w-full">
+    <div className="relative flex flex-col h-full bg-gray-100 w-full">
+
+      {/* Intake modal */}
+      {showIntake && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-5">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Before we connect you</h2>
+              <p className="text-sm text-gray-500 mt-1">Help us match you with the right navigator.</p>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="intake-language" className="text-sm font-medium text-gray-700">
+                Preferred language
+              </label>
+              <select
+                id="intake-language"
+                value={intakeLanguage}
+                onChange={(e) => setIntakeLanguage(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+              >
+                <option value="" disabled>Select a language</option>
+                {LANGUAGES.map((l) => (
+                  <option key={l.value} value={l.value}>{l.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="intake-category" className="text-sm font-medium text-gray-700">
+                What do you need help with?
+              </label>
+              <select
+                id="intake-category"
+                value={intakeCategory}
+                onChange={(e) => setIntakeCategory(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+              >
+                <option value="" disabled>Select a category</option>
+                {NEED_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleIntakeSubmit}
+              disabled={!intakeLanguage || !intakeCategory}
+              className="w-full bg-brand-yellow text-gray-900 font-medium text-sm py-3 rounded-md hover:brightness-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Start chat
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
         <div className="w-8" />
         <span className="font-medium text-base text-gray-900">StreetLives</span>
-        <button type="button" onClick={handleEndChat} className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 transition" aria-label="End chat">
-          END CHAT
-          <X size={18} strokeWidth={2.5} />
-        </button>
+        {confirmEnd ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">End chat?</span>
+            <button
+              type="button"
+              onClick={handleEndChat}
+              className="text-xs font-medium text-red-500 hover:text-red-700 transition"
+            >
+              Yes
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmEnd(false)}
+              className="text-xs font-medium text-gray-500 hover:text-gray-700 transition"
+            >
+              No
+            </button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setConfirmEnd(true)} className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 transition" aria-label="End chat">
+            End chat
+            <X size={18} strokeWidth={2.5} />
+          </button>
+        )}
       </header>
 
       {/* Connection status */}
