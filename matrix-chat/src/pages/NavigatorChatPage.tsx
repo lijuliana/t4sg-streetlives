@@ -109,25 +109,17 @@ const NavigatorChatPage: React.FC<NavigatorChatPageProps> = ({
         // m.room.message; events with missing keys are still m.room.encrypted
         // and get a late-decryption watcher attached below.
         const room = client.getRoom(roomId);
-        console.log("[NavigatorChat] Room found:", !!room, "| Room ID:", roomId);
 
         if (room) {
           const allEvents = room.getLiveTimeline().getEvents();
-          let plain = 0,
-            encrypted = 0;
           for (const ev of allEvents) {
             const msg = matrixEventToMessage(ev);
             if (msg) {
-              plain++;
               setMessages((prev) => [...prev, msg]);
             } else if (ev.getType() === "m.room.encrypted") {
-              encrypted++;
               watchDecryption(ev);
             }
           }
-          console.log(
-            `[NavigatorChat] Initial events: ${plain} plain, ${encrypted} still-encrypted`,
-          );
 
           // prepareToEncrypt pre-fetches device keys for all room members and
           // creates the outbound Megolm session. The SDK docs mark this as

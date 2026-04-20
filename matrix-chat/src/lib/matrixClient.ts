@@ -97,7 +97,6 @@ async function _init(session: MatrixSessionConfig): Promise<MatrixClient> {
   localStorage.setItem("mx_device_id", deviceId);
 
   // ── 2. Open IndexedDB room store ─────────────────────────────────────────
-  console.log("[matrixClient] Opening IndexedDB room store …");
   const store = new IndexedDBStore({
     indexedDB: window.indexedDB,
     localStorage: window.localStorage,
@@ -106,7 +105,6 @@ async function _init(session: MatrixSessionConfig): Promise<MatrixClient> {
   await store.startup();
 
   // ── 3. Create SDK client ─────────────────────────────────────────────────
-  console.log("[matrixClient] Creating MatrixClient …");
   const client = createClient({
     baseUrl,
     accessToken,
@@ -123,7 +121,6 @@ async function _init(session: MatrixSessionConfig): Promise<MatrixClient> {
   // { type: "m.room.encryption", ... } to the room's initial_state in the backend.
 
   // ── 4. Start sync and wait for PREPARED ──────────────────────────────────
-  console.log("[matrixClient] Starting sync, waiting for PREPARED …");
   client.startClient({ initialSyncLimit: 50 });
 
   await new Promise<void>((resolve, reject) => {
@@ -149,6 +146,5 @@ async function _init(session: MatrixSessionConfig): Promise<MatrixClient> {
   });
 
   _activeClient = client;
-  console.log("[matrixClient] Client ready.");
   return client;
 }

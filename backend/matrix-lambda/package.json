@@ -1,0 +1,7 @@
+{
+  "name": "streetlives-matrix-lambda",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Matrix bot Lambda for Streetlives — handles room creation and messaging",
+  "main": "index.mjs"
+}

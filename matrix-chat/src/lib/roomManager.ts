@@ -23,7 +23,5 @@ export async function ensureRoomJoined(
   // Room is in sync state AND the client has fully joined (not just invited).
   if (room?.getMyMembership() === "join") return;
 
-  console.log("[roomManager] Not yet joined, attempting join:", roomId);
   await client.joinRoom(roomId);
-  console.log("[roomManager] Joined room:", roomId);
 }
