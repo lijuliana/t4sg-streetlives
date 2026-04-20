@@ -3,15 +3,6 @@ import Image from "next/image";
 import Navbar from "@/components/Navbar";
 import TestimonialCarousel from "@/components/TestimonialCarousel";
 import ChatFAB from "@/components/ChatFAB";
-import { auth0 } from "@/lib/auth0";
-
-const ROLES_CLAIM = "https://streetlives.app/roles";
-
-const ROLE_DASHBOARD: Record<string, { href: string; label: string }> = {
-  navigator: { href: "/dashboard/navigator", label: "Go to Navigator Dashboard" },
-  supervisor: { href: "/dashboard/supervisor", label: "Go to Supervisor Dashboard" },
-  user: { href: "/dashboard/user", label: "Go to My Dashboard" },
-};
 
 const services = [
   { icon: "/new-icons/house.svg",       name: "Accommodations",  description: "A place to stay, shelter, vouchers" },
@@ -51,21 +42,12 @@ export default async function HomePage() {
           Search through hundreds of free support services in NYC that are right
           for you.
         </p>
-        {dashboard ? (
-          <Link
-            href={dashboard.href}
-            className="mt-6 inline-block bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-lg hover:opacity-90 transition"
-          >
-            {dashboard.label}
-          </Link>
-        ) : (
-          <button
-            type="button"
-            className="mt-6 bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-lg hover:opacity-90 transition"
-          >
-            Get started below
-          </button>
-        )}
+        <button
+          type="button"
+          className="mt-6 bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-md hover:opacity-90 transition"
+        >
+          Get started below
+        </button>
       </section>
 
       {/* Service Categories */}
@@ -117,7 +99,7 @@ export default async function HomePage() {
         </p>
         <button
           type="button"
-          className="mt-6 bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-lg hover:opacity-90 transition"
+          className="mt-6 bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-md hover:opacity-90 transition"
         >
           Learn from Peers
         </button>
@@ -140,7 +122,7 @@ export default async function HomePage() {
         </p>
         <Link
           href="#"
-          className="mt-6 inline-block bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-lg hover:opacity-90 transition"
+          className="mt-6 inline-block bg-brand-dark text-white text-sm font-medium px-6 py-3 rounded-md hover:opacity-90 transition"
         >
           Sign into Provider Portal
         </Link>

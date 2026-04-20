@@ -258,7 +258,7 @@ export function ChatContent() {
       if (msg.role === "user") {
         return (
           <div key={msg.id} className="flex flex-col items-end mb-3 max-w-[80%] ml-auto">
-            <div className="bg-brand-yellow text-gray-900 text-sm px-4 py-2.5 rounded-2xl rounded-br-sm w-fit">
+            <div className="bg-brand-yellow text-gray-900 text-sm px-4 py-2.5 rounded-md rounded-br-sm w-fit">
               {msg.content}
             </div>
             <span className="text-[10px] text-gray-400 mt-1 mr-1">{ts}</span>
@@ -270,7 +270,7 @@ export function ChatContent() {
         <div key={msg.id} className="flex gap-3 mb-3 max-w-[80%]">
           <NavigatorAvatar />
           <div className="flex flex-col">
-            <div className="bg-white text-gray-900 text-sm px-4 py-2.5 rounded-2xl rounded-tl-sm shadow-sm w-fit">
+            <div className="bg-white text-gray-900 text-sm px-4 py-2.5 rounded-md rounded-tl-sm shadow-sm w-fit">
               {msg.content}
             </div>
             <span className="text-[10px] text-gray-400 mt-1 ml-1">{ts}</span>
@@ -397,7 +397,7 @@ export function ChatContent() {
           <button
             type="button"
             onClick={handleStartNewChat}
-            className="inline-block bg-brand-yellow text-gray-900 text-sm font-medium px-5 py-2 rounded-xl hover:brightness-95 transition"
+            className="inline-block bg-brand-yellow text-gray-900 text-sm font-medium px-5 py-2 rounded-md hover:brightness-95 transition"
           >
             Start New Chat
           </button>

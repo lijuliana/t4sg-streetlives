@@ -56,7 +56,7 @@ export default async function Navbar({ className }: NavbarProps) {
             {dashboardHref && (
               <Link
                 href={dashboardHref}
-                className="text-sm font-medium text-brand-dark hover:opacity-70 transition-opacity hidden sm:inline"
+                className="text-sm font-medium text-brand-dark px-3 py-1.5 rounded-md hover:brightness-95 transition hidden sm:inline"
               >
                 Dashboard
               </Link>
@@ -70,21 +70,15 @@ export default async function Navbar({ className }: NavbarProps) {
           </>
         ) : (
           <>
-            <Link
-              href="/dashboard/user"
-              className="text-sm font-medium text-brand-dark hover:opacity-70 transition-opacity hidden sm:inline"
-            >
-              Dashboard
-            </Link>
             <a
               href="/auth/signin"
-              className="text-sm text-gray-600 hover:opacity-70 transition-opacity hidden sm:inline"
+              className="text-sm font-medium text-brand-dark px-3 py-1.5 rounded-md hover:brightness-95 transition hidden sm:inline"
             >
               Sign In
             </a>
             <a
               href="/auth/signup"
-              className="text-sm text-brand-dark bg-brand-yellow px-3 py-1.5 rounded-lg hover:brightness-95 transition hidden sm:inline"
+              className="text-sm font-medium text-brand-dark px-3 py-1.5 rounded-md hover:brightness-95 transition hidden sm:inline"
             >
               Sign Up
             </a>

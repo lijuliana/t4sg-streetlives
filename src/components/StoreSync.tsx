@@ -10,7 +10,7 @@ import { useStore } from "@/lib/store";
 export default function StoreSync() {
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === "streetlives-store-v4") {
+      if (e.key === "streetlives-store-v9") {
         useStore.persist.rehydrate();
       }
     };

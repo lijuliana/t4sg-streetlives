@@ -31,7 +31,7 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay: index * 0.05 }}
-      className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm"
+      className="bg-white rounded-md border border-gray-200 p-4 shadow-sm"
     >
       <div className="flex items-center gap-3 mb-3">
         <div className="w-9 h-9 rounded-full bg-brand-yellow flex items-center justify-center text-xs font-medium text-gray-900 flex-shrink-0">

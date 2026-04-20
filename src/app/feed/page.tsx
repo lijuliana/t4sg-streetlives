@@ -8,7 +8,7 @@ const MOCK_POSTS = [
     id: "1",
     content: "Just found out that the drop-in center on 42nd opens at 7am on weekdays now. Great for getting breakfast before job searches.",
     created_at: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    author_email: "marcus.t@example.com",
+    author_email: "marcus.turner@example.com",
   },
   {
     id: "2",
@@ -20,7 +20,7 @@ const MOCK_POSTS = [
     id: "3",
     content: "BRC on 30th St was super helpful — they connected me with a housing specialist same day. If you need case management don't sleep on it.",
     created_at: new Date(Date.now() - 1000 * 60 * 60 * 11).toISOString(),
-    author_email: "jess.m@example.com",
+    author_email: "jessica.morgan@example.com",
   },
   {
     id: "4",
@@ -32,7 +32,7 @@ const MOCK_POSTS = [
     id: "5",
     content: "Finally got into transitional housing after 8 months on the list. For anyone still waiting — keep checking in weekly, that's what made a difference for me.",
     created_at: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-    author_email: "dani.r@example.com",
+    author_email: "danielle.roberts@example.com",
   },
 ];
 

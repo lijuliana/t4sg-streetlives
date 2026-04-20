@@ -44,7 +44,7 @@ export default function RoleSwitcher() {
               type="button"
               onClick={() => handleSwitch(id)}
               className={cn(
-                "flex-1 text-xs font-medium py-1.5 rounded-lg transition",
+                "flex-1 text-xs font-medium py-1.5 rounded-md transition",
                 activeRole === id
                   ? "bg-brand-yellow text-gray-900"
                   : "bg-gray-700 text-gray-300 hover:bg-gray-600"

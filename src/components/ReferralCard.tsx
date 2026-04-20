@@ -13,7 +13,7 @@ export default function ReferralCard({ referral, editable = false }: Props) {
   const updateReferralStatus = useStore((s) => s.updateReferralStatus);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 space-y-2">
+    <div className="bg-white border border-gray-200 rounded-md px-4 py-3 space-y-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-gray-900 truncate">{referral.serviceName}</p>
@@ -30,7 +30,7 @@ export default function ReferralCard({ referral, editable = false }: Props) {
               updateReferralStatus(referral.id, e.target.value as ReferralStatus)
             }
             className={cn(
-              "text-xs font-medium rounded-lg px-2.5 py-1 border-none outline-none cursor-pointer flex-shrink-0 appearance-none",
+              "text-xs font-medium rounded-md px-2.5 py-1 border-none outline-none cursor-pointer flex-shrink-0 appearance-none",
               REFERRAL_STATUS_STYLES[referral.status]
             )}
           >

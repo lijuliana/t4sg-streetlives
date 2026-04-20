@@ -27,7 +27,7 @@ export default function UserSessionDetailPage() {
       backHref="/dashboard/user"
     >
       {/* Session header */}
-      <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-3">
+      <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500 mb-0.5">Navigator</p>
@@ -59,7 +59,7 @@ export default function UserSessionDetailPage() {
           <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-2">
             Session Summary
           </h2>
-          <div className="bg-white border border-gray-200 rounded-xl px-5 py-4">
+          <div className="bg-white border border-gray-200 rounded-md px-5 py-4">
             <p className="text-sm text-gray-700">{session.summary}</p>
           </div>
         </div>
@@ -71,7 +71,7 @@ export default function UserSessionDetailPage() {
           Referrals ({session.referrals.length})
         </h2>
         {session.referrals.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl px-5 py-6 text-center">
+          <div className="bg-white border border-gray-200 rounded-md px-5 py-6 text-center">
             <p className="text-sm text-gray-400">No referrals in this session</p>
           </div>
         ) : (

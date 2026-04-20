@@ -9,7 +9,7 @@ export default function NewPostPage() {
       <div className="px-5 pt-10 pb-8 flex items-start gap-4">
         <Link
           href="/feed"
-          className="mt-1 p-1 rounded-lg hover:bg-black/10 transition"
+          className="mt-1 p-1 rounded-md hover:bg-black/10 transition"
           aria-label="Back to feed"
         >
           <ArrowLeft size={20} className="text-gray-900" />

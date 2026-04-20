@@ -19,8 +19,15 @@ function loadBarClass(active: number, capacity: number): string {
   return "w-1/12";
 }
 
-function NavigatorRow({ navigator }: { navigator: Navigator }) {
-  const [expanded, setExpanded] = useState(false);
+function NavigatorRow({
+  navigator,
+  expanded,
+  onToggle,
+}: {
+  navigator: Navigator;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
   const allSessions = useStore((s) => s.sessions);
   const sessions = allSessions
     .filter((s) => s.navigatorId === navigator.id)
@@ -34,12 +41,13 @@ function NavigatorRow({ navigator }: { navigator: Navigator }) {
   const activeCount = sessions.filter((s) => s.status === "active" || s.status === "queued").length;
   const closedCount = sessions.filter((s) => s.status === "closed").length;
   const isHighLoad = navigator.capacity > 0 && activeCount / navigator.capacity > 0.75;
+  const hasSubmitted = sessions.some((s) => s.reviewStatus === "submitted");
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
       <button
         type="button"
-        onClick={() => setExpanded(!expanded)}
+        onClick={onToggle}
         className="w-full flex items-center gap-3 px-5 py-4 hover:bg-gray-50 transition text-left"
       >
         {/* Avatar */}
@@ -53,7 +61,12 @@ function NavigatorRow({ navigator }: { navigator: Navigator }) {
 
         {/* Name + load */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900">{navigator.name}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-medium text-gray-900">{navigator.name}</p>
+            {hasSubmitted && (
+              <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+            )}
+          </div>
           <div className="flex gap-2 mt-0.5 items-center">
             <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
               {activeCount} active
@@ -87,7 +100,6 @@ function NavigatorRow({ navigator }: { navigator: Navigator }) {
               key={session.id}
               session={session}
               viewerRole="supervisor"
-              index={i}
             />
           ))}
         </div>
@@ -105,6 +117,7 @@ function NavigatorRow({ navigator }: { navigator: Navigator }) {
 export default function SupervisorDashboardPage() {
   const sessions = useStore((s) => s.sessions);
   const navigators = useStore((s) => s.navigators);
+  const [expandedNavId, setExpandedNavId] = useState<string | null>(null);
 
   const today = moment().startOf("day");
 
@@ -117,20 +130,21 @@ export default function SupervisorDashboardPage() {
     (s) => s.status === "closed" && moment(s.closedAt).isAfter(today)
   ).length;
   const totalReferrals = sessions.reduce((sum, s) => sum + s.referrals.length, 0);
+  const awaitingReview = sessions.filter((s) => s.reviewStatus === "submitted").length;
 
   return (
-    <DashboardShell title="Overview" role="supervisor">
+    <DashboardShell title="Sessions" role="supervisor">
       {/* Metrics grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-4 text-center">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="bg-white border border-gray-200 rounded-md px-4 py-4 text-center">
           <p className="text-3xl font-normal text-gray-900">{totalSessions}</p>
           <p className="text-xs text-gray-500 mt-1">Total Sessions</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-4 text-center">
+        <div className="bg-white border border-gray-200 rounded-md px-4 py-4 text-center">
           <p className="text-3xl font-normal text-green-700">{activeNow}</p>
           <p className="text-xs text-gray-500 mt-1">Active</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-4 text-center">
+        <div className="bg-white border border-gray-200 rounded-md px-4 py-4 text-center">
           <p className={`text-3xl font-normal ${newRequests > 0 ? "text-amber-600" : "text-gray-900"}`}>
             {newRequests}
           </p>
@@ -138,9 +152,13 @@ export default function SupervisorDashboardPage() {
             New Requests
           </p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-4 text-center">
+        <div className="bg-white border border-gray-200 rounded-md px-4 py-4 text-center">
           <p className="text-3xl font-normal text-blue-600">{totalReferrals}</p>
           <p className="text-xs text-gray-500 mt-1">Total Referrals</p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-md px-4 py-4 text-center">
+          <p className={`text-3xl font-normal ${awaitingReview > 0 ? "text-amber-600" : "text-gray-900"}`}>{awaitingReview}</p>
+          <p className={`text-xs mt-1 ${awaitingReview > 0 ? "text-amber-600 font-medium" : "text-gray-500"}`}>Awaiting Review</p>
         </div>
       </div>
 
@@ -151,7 +169,12 @@ export default function SupervisorDashboardPage() {
         </h2>
         <div className="space-y-2">
           {navigators.map((nav) => (
-            <NavigatorRow key={nav.id} navigator={nav} />
+            <NavigatorRow
+              key={nav.id}
+              navigator={nav}
+              expanded={expandedNavId === nav.id}
+              onToggle={() => setExpandedNavId(expandedNavId === nav.id ? null : nav.id)}
+            />
           ))}
         </div>
       </section>

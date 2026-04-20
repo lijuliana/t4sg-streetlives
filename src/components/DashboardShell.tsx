@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, MessageCircle } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import type { AppRole } from "@/lib/store";
 
 const ROLE_LABELS: Record<AppRole, string> = {
@@ -12,14 +12,14 @@ const ROLE_LABELS: Record<AppRole, string> = {
 };
 
 const ROLE_COLORS: Record<AppRole, string> = {
-  user: "bg-blue-100 text-blue-700",
+  user: "bg-brand-yellow text-gray-900",
   navigator: "bg-brand-yellow text-gray-900",
-  supervisor: "bg-purple-100 text-purple-700",
+  supervisor: "bg-brand-yellow text-gray-900",
 };
 
 interface Props {
   title: string;
-  role: AppRole;
+  role?: AppRole;
   backHref?: string;
   action?: React.ReactNode;
   children: React.ReactNode;
@@ -46,22 +46,15 @@ export default function DashboardShell({ title, role, backHref, action, children
           <Link href="/" className="font-medium text-sm text-gray-900 hover:opacity-70 transition-opacity">
             StreetLives
           </Link>
-          <span
-            className={`text-xs font-medium px-2 py-0.5 rounded-full ${ROLE_COLORS[role]}`}
-          >
-            {ROLE_LABELS[role]}
-          </span>
+          {role && (
+            <span
+              className={`text-xs font-medium px-2 py-0.5 rounded-full ${ROLE_COLORS[role]}`}
+            >
+              {ROLE_LABELS[role]}
+            </span>
+          )}
           <div className="flex-1" />
           {action}
-          {role === "user" && !action && (
-            <Link
-              href="/chat"
-              className="p-1 text-gray-500 hover:text-gray-800 transition"
-              aria-label="Open chat"
-            >
-              <MessageCircle size={20} strokeWidth={2} />
-            </Link>
-          )}
         </div>
         <div className="max-w-lg mx-auto px-4 pb-3">
           <h1 className="text-xl font-normal text-gray-900">{title}</h1>
