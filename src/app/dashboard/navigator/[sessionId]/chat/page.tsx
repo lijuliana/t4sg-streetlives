@@ -1,14 +1,38 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Send, X } from "lucide-react";
 import moment from "moment";
 import { cn } from "@/lib/utils";
-import { useStore } from "@/lib/store";
-import type { ChatMessage } from "@/lib/store";
 
-const EMPTY_MSGS: ChatMessage[] = [];
+const POLL_MS = 3000;
+
+interface RealSession {
+  id: string;
+  navigator_id: string | null;
+  need_category: string;
+  status: string;
+}
+
+interface MatrixMessage {
+  eventId: string;
+  body: string;
+  timestamp: number;
+}
+
+interface LocalMessage {
+  id: string;
+  role: "user" | "navigator";
+  content: string;
+  timestamp: string;
+}
+
+function parseMessage(body: string): { sender: string; text: string } {
+  const colonIdx = body.indexOf(": ");
+  if (colonIdx === -1) return { sender: "Navigator", text: body };
+  return { sender: body.slice(0, colonIdx), text: body.slice(colonIdx + 2) };
+}
 
 function UserAvatar() {
   return (
@@ -21,54 +45,91 @@ function UserAvatar() {
   );
 }
 
-
 export default function NavigatorChatPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const router = useRouter();
 
-  const getSessionById = useStore((s) => s.getSessionById);
-  const addChatMessage = useStore((s) => s.addChatMessage);
-  const endSession = useStore((s) => s.endSession);
-  const activeRole = useStore((s) => s.activeRole);
-
-  // Stable selector — returns same reference until messages change
-  const messages = useStore((s) => s.chatMessages[sessionId] ?? EMPTY_MSGS);
-
-  const session = getSessionById(sessionId);
+  const [session, setSession] = useState<RealSession | null>(null);
+  const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const isReadOnly = activeRole === "supervisor" || session?.status === "closed";
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const seenEventIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  if (!session) {
-    return (
-      <div className="flex flex-col h-screen items-center justify-center bg-gray-100">
-        <p className="text-sm text-gray-500">Session not found.</p>
-        <button type="button" onClick={() => router.back()} className="mt-3 text-xs text-gray-400 underline">
-          Go back
-        </button>
-      </div>
-    );
-  }
+  // Fetch session info once on mount
+  useEffect(() => {
+    fetch(`/api/sessions/${sessionId}`)
+      .then((r) => r.json())
+      .then(setSession)
+      .catch(console.error);
+  }, [sessionId]);
 
-  const handleSend = () => {
+  const appendMessages = useCallback((raw: MatrixMessage[]) => {
+    const newMsgs: LocalMessage[] = [];
+    for (const m of raw) {
+      if (seenEventIds.current.has(m.eventId)) continue;
+      seenEventIds.current.add(m.eventId);
+      const { sender, text } = parseMessage(m.body);
+      newMsgs.push({
+        id: m.eventId,
+        role: sender === "User" ? "user" : "navigator",
+        content: text,
+        timestamp: new Date(m.timestamp).toISOString(),
+      });
+    }
+    if (newMsgs.length > 0) setMessages((prev) => [...prev, ...newMsgs]);
+  }, []);
+
+  // Poll messages
+  useEffect(() => {
+    const poll = () => {
+      fetch(`/api/sessions/${sessionId}/messages`)
+        .then((r) => r.json())
+        .then((data) => appendMessages(data.messages ?? []))
+        .catch(console.error);
+    };
+    poll(); // immediate first fetch
+    pollRef.current = setInterval(poll, POLL_MS);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [sessionId, appendMessages]);
+
+  const isReadOnly = session?.status === "closed";
+
+  const handleSend = async () => {
     const text = inputValue.trim();
     if (!text || isReadOnly) return;
     setInputValue("");
-    addChatMessage(sessionId, { role: "navigator", content: text });
+    setSendError(null);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/navigator-messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setSendError(err.error ?? "Failed to send");
+      }
+    } catch {
+      setSendError("Network error");
+    }
     setTimeout(() => inputRef.current?.focus(), 50);
   };
 
-  const handleEndSession = () => {
-    endSession(sessionId);
+  const handleEndSession = async () => {
+    await fetch(`/api/sessions/${sessionId}/close`, { method: "POST" });
     setShowEndConfirm(false);
-    router.push(`/dashboard/navigator/${sessionId}`);
+    router.push("/dashboard/navigator");
   };
 
   const renderMessages = () => {
@@ -88,57 +149,12 @@ export default function NavigatorChatPage() {
     }
 
     return messages.map((msg, i) => {
-      // System message — divider
-      if (msg.role === "system") {
-        return (
-          <div key={msg.id} className="flex items-center gap-3 my-4">
-            <div className="flex-1 h-px bg-gray-200" />
-            <p className="text-xs text-gray-400 whitespace-nowrap">{msg.content}</p>
-            <div className="flex-1 h-px bg-gray-200" />
-          </div>
-        );
-      }
-
       const ts = moment(msg.timestamp).format("h:mm A");
 
-      // Service referral card — right-aligned (navigator's own message)
-      if (msg.serviceId) {
-        const hasDetail = msg.serviceId !== "unlinked";
+      if (msg.role === "navigator") {
         return (
           <div key={msg.id} className="flex flex-col items-end mb-3 max-w-[80%] ml-auto">
-            {hasDetail ? (
-              <button
-                type="button"
-                onClick={() => router.push(`/services/${msg.serviceId}?back=/dashboard/navigator/${sessionId}/chat`)}
-                className="bg-brand-yellow text-gray-900 text-sm px-4 py-3 rounded-md rounded-br-sm text-left w-fit hover:brightness-95 transition"
-              >
-                <p className="font-medium">{msg.content}</p>
-                <p className="text-xs mt-0.5 underline">Click here for details →</p>
-              </button>
-            ) : (
-              <div className="bg-brand-yellow text-gray-900 text-sm px-4 py-3 rounded-md rounded-br-sm w-fit">
-                <p className="font-medium">{msg.content}</p>
-                <p className="text-xs mt-0.5 text-gray-700">Referral shared</p>
-              </div>
-            )}
-            <span className="text-[10px] text-gray-400 mt-1 mr-1">{ts}</span>
-          </div>
-        );
-      }
-
-      // Navigator + bot messages — right-aligned (our side)
-      if (msg.role === "navigator" || msg.role === "bot") {
-        const isNavigator = msg.role === "navigator";
-        return (
-          <div key={msg.id} className="flex flex-col items-end mb-3 max-w-[80%] ml-auto">
-            <div
-              className={cn(
-                "text-sm px-4 py-2.5 rounded-md rounded-br-sm w-fit",
-                isNavigator
-                  ? "bg-brand-yellow text-gray-900"
-                  : "bg-gray-200 text-gray-700"
-              )}
-            >
+            <div className="bg-brand-yellow text-gray-900 text-sm px-4 py-2.5 rounded-2xl rounded-br-sm w-fit">
               {msg.content}
             </div>
             <span className="text-[10px] text-gray-400 mt-1 mr-1">{ts}</span>
@@ -146,9 +162,8 @@ export default function NavigatorChatPage() {
         );
       }
 
-      // User messages — left-aligned
       const prevMsg = messages[i - 1];
-      const showAvatar = !prevMsg || prevMsg.role !== "user" || (prevMsg.role as string) === "system";
+      const showAvatar = !prevMsg || prevMsg.role !== "user";
       return (
         <div key={msg.id} className={cn("flex gap-3 mb-3 max-w-[80%]", !showAvatar && "pl-13")}>
           {showAvatar ? <UserAvatar /> : <div className="w-10 flex-shrink-0" />}
@@ -163,27 +178,29 @@ export default function NavigatorChatPage() {
     });
   };
 
+  const categoryLabel = session?.need_category?.replace("_", " ") ?? "Chat";
+
   return (
     <div className="flex flex-col h-screen bg-gray-100 w-full">
       {/* Header */}
       <header className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
         <button
           type="button"
-          onClick={() => router.push(`/dashboard/navigator/${sessionId}`)}
+          onClick={() => router.push("/dashboard/navigator")}
           className="p-1 -ml-1 text-gray-500 hover:text-gray-800 transition"
-          aria-label="Back to session"
+          aria-label="Back"
         >
           <ArrowLeft size={20} strokeWidth={2} />
         </button>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">
-            {isReadOnly ? "Transcript" : "Chat"} · {session.userDisplayName}
+          <p className="text-sm font-medium text-gray-900 truncate capitalize">
+            {isReadOnly ? "Transcript" : "Chat"} · {categoryLabel}
           </p>
           <p className="text-xs text-gray-400">
-            {isReadOnly ? "Read-only" : `Responding as ${session.navigatorName}`}
+            {isReadOnly ? "Read-only" : "Responding as you"}
           </p>
         </div>
-        {!isReadOnly && session.status !== "closed" && (
+        {!isReadOnly && (
           <button
             type="button"
             onClick={() => setShowEndConfirm(true)}
@@ -199,10 +216,18 @@ export default function NavigatorChatPage() {
       {showEndConfirm && (
         <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 flex-shrink-0">
           <p className="text-sm text-gray-700 flex-1">End this session?</p>
-          <button type="button" onClick={() => setShowEndConfirm(false)} className="text-xs text-gray-500 px-3 py-1.5 rounded-md border border-gray-200 hover:bg-gray-50 transition">
+          <button
+            type="button"
+            onClick={() => setShowEndConfirm(false)}
+            className="text-xs text-gray-500 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition"
+          >
             Cancel
           </button>
-          <button type="button" onClick={handleEndSession} className="text-xs font-medium text-gray-900 px-3 py-1.5 rounded-md bg-brand-yellow hover:brightness-95 transition">
+          <button
+            type="button"
+            onClick={handleEndSession}
+            className="text-xs font-medium text-gray-900 px-3 py-1.5 rounded-lg bg-brand-yellow hover:brightness-95 transition"
+          >
             Confirm End
           </button>
         </div>
@@ -214,7 +239,11 @@ export default function NavigatorChatPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input bar — hidden for read-only */}
+      {sendError && (
+        <p className="px-4 py-1 text-xs text-red-500 bg-white border-t border-gray-100">{sendError}</p>
+      )}
+
+      {/* Input bar */}
       {!isReadOnly && (
         <div className="px-4 py-3 bg-white border-t border-gray-200 flex items-center gap-3 flex-shrink-0">
           <input
@@ -223,7 +252,7 @@ export default function NavigatorChatPage() {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            placeholder={`Reply as ${session.navigatorName}…`}
+            placeholder="Reply…"
             className="flex-1 text-sm text-gray-700 bg-transparent outline-none placeholder-gray-400"
           />
           <button

@@ -94,25 +94,17 @@ const NavigatorChatPage: React.FC<NavigatorChatPageProps> = ({
         const crypto = client.getCrypto();
 
         const room = client.getRoom(roomId);
-        console.log("[NavigatorChat] Room found:", !!room, "| Room ID:", roomId);
 
         if (room) {
           const allEvents = room.getLiveTimeline().getEvents();
-          let plain = 0,
-            encrypted = 0;
           for (const ev of allEvents) {
             const msg = matrixEventToMessage(ev);
             if (msg) {
-              plain++;
               setMessages((prev) => [...prev, msg]);
             } else if (ev.getType() === "m.room.encrypted") {
-              encrypted++;
               watchDecryption(ev);
             }
           }
-          console.log(
-            `[NavigatorChat] Initial events: ${plain} plain, ${encrypted} still-encrypted`,
-          );
 
           crypto?.prepareToEncrypt(room);
         }

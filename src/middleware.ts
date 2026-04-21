@@ -10,8 +10,16 @@ export async function middleware(request: NextRequest) {
     return await auth0.middleware(request);
   }
 
-  // /chat is public
+  // /chat is for anonymous users only — anyone logged in gets sent to their dashboard
   if (pathname.startsWith("/chat")) {
+    const session = await auth0.getSession(request);
+    if (session) {
+      const roles: string[] = (session.user?.[ROLES_CLAIM] as string[]) ?? [];
+      if (roles.includes("supervisor")) return NextResponse.redirect(new URL("/dashboard/supervisor", request.nextUrl.origin));
+      if (roles.includes("navigator")) return NextResponse.redirect(new URL("/dashboard/navigator", request.nextUrl.origin));
+      // Logged in but no recognized role — send home, not to chat
+      return NextResponse.redirect(new URL("/", request.nextUrl.origin));
+    }
     return NextResponse.next();
   }
 

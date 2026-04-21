@@ -1,12 +1,87 @@
-"use client";
-
-import { useStore } from "@/lib/store";
-import { hasUnresponded24h } from "@/lib/utils";
-import type { Session, ChatMessage } from "@/lib/store";
+import { auth0 } from "@/lib/auth0";
+import { lambdaFetch } from "@/lib/lambda";
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import moment from "moment";
 import DashboardShell from "@/components/DashboardShell";
-import SessionCard from "@/components/SessionCard";
+import SessionStatusBadge from "@/components/SessionStatusBadge";
 
-const DEMO_NAVIGATOR_ID = "nav-1";
+interface RealSession {
+  id: string;
+  navigator_id: string | null;
+  need_category: string;
+  language: string | null;
+  status: string;
+  created_at: string;
+  closed_at: string | null;
+  routing_reason: object | null;
+}
+
+interface NavProfile {
+  id: string;
+  auth0_user_id: string;
+  nav_group: string;
+  status: string;
+  capacity: number;
+}
+
+function mapStatus(s: string): "queued" | "active" | "closed" {
+  if (s === "unassigned") return "queued";
+  if (s === "closed") return "closed";
+  return "active";
+}
+
+function SessionRow({ session }: { session: RealSession }) {
+  const status = mapStatus(session.status);
+  return (
+    <Link
+      href={`/dashboard/navigator/${session.id}/chat`}
+      className="block bg-white border border-gray-200 rounded-xl px-4 py-3.5 hover:border-gray-300 hover:shadow-md transition"
+    >
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-brand-yellow flex items-center justify-center flex-shrink-0">
+          <span className="text-xs font-medium text-gray-900 capitalize">
+            {session.need_category.slice(0, 2).toUpperCase()}
+          </span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900 capitalize">{session.need_category.replace("_", " ")}</p>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            {session.language && (
+              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                {session.language.toUpperCase()}
+              </span>
+            )}
+            {session.routing_reason && (
+              <span className="text-[10px] bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded-full">Routed</span>
+            )}
+            <span className="text-xs text-gray-400">
+              {moment(session.created_at).calendar(null, {
+                sameDay: "[Today at] h:mm A",
+                lastDay: "[Yesterday at] h:mm A",
+                lastWeek: "MMM D [at] h:mm A",
+                sameElse: "MMM D, YYYY [at] h:mm A",
+              })}
+            </span>
+          </div>
+        </div>
+        <SessionStatusBadge status={status} size="sm" />
+      </div>
+    </Link>
+  );
+}
+
+export default async function NavigatorDashboardPage() {
+  const session = await auth0.getSession();
+  if (!session) redirect("/auth/login");
+
+  const [sessionsRes, navsRes] = await Promise.all([
+    lambdaFetch("/sessions"),
+    lambdaFetch("/navigators"),
+  ]);
+
+  const sessionsBody = await sessionsRes.json().catch(() => ({}));
+  const navsBody = await navsRes.json().catch(() => ({}));
 
 function sortByUrgency(
   sessions: Session[],

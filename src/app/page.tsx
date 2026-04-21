@@ -3,6 +3,15 @@ import Image from "next/image";
 import Navbar from "@/components/Navbar";
 import TestimonialCarousel from "@/components/TestimonialCarousel";
 import ChatFAB from "@/components/ChatFAB";
+import { auth0 } from "@/lib/auth0";
+
+const ROLES_CLAIM = "https://streetlives.app/roles";
+
+const ROLE_DASHBOARD: Record<string, string> = {
+  navigator: "/dashboard/navigator",
+  supervisor: "/dashboard/supervisor",
+  user: "/dashboard/user",
+};
 
 const services = [
   { icon: "/new-icons/house.svg",       name: "Accommodations",  description: "A place to stay, shelter, vouchers" },
@@ -18,7 +27,17 @@ const services = [
   { icon: "/new-icons/chat.svg",        name: "Need Help?",      description: "Use our chat assistant" },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await auth0.getSession();
+  const roles: string[] = (session?.user?.[ROLES_CLAIM] as string[]) ?? [];
+  const matchedRole = roles.find((r) => ROLE_DASHBOARD[r] !== undefined) ?? (session ? "user" : null);
+  const dashboard = matchedRole ? ROLE_DASHBOARD[matchedRole] : null;
+  const staffDashboardHref = roles.includes("supervisor")
+    ? "/dashboard/supervisor"
+    : roles.includes("navigator")
+      ? "/dashboard/navigator"
+      : null;
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -129,7 +148,7 @@ export default function HomePage() {
         <p className="mt-4 text-xs text-gray-400">© StreetLives.org</p>
       </footer>
 
-      <ChatFAB />
+      <ChatFAB staffDashboardHref={staffDashboardHref} />
     </div>
   );
 }

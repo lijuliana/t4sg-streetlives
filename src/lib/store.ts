@@ -95,23 +95,13 @@ export interface Session {
   reviewedAt?: string;
 }
 
-// ─── Routing ──────────────────────────────────────────────────────────────────
-
-export function routeSession(
-  needCategory: string,
-  navigators: Navigator[],
-  sessions: Session[]
-): string | null {
+function routeSession(needCategory: string, navigators: Navigator[], sessions: Session[]): string | null {
   const pool = navigators.filter((n) => n.available);
-  const matching = pool.filter((n) =>
-    n.specialties.some((s) => s.toLowerCase() === needCategory.toLowerCase())
-  );
+  const matching = pool.filter((n) => n.specialties.some((s) => s.toLowerCase() === needCategory.toLowerCase()));
   const candidates = matching.length > 0 ? matching : pool;
   if (candidates.length === 0) return null;
   return [...candidates].sort((a, b) => {
-    const load = (nav: Navigator) =>
-      sessions.filter((s) => s.navigatorId === nav.id && s.status === "active").length /
-      nav.capacity;
+    const load = (nav: Navigator) => sessions.filter((s) => s.navigatorId === nav.id && s.status === "active").length / nav.capacity;
     return load(a) - load(b);
   })[0].id;
 }
@@ -158,7 +148,6 @@ interface StreetLivesStore {
 
   chatMessages: Record<string, ChatMessage[]>;
   addChatMessage: (sessionId: string, msg: Omit<ChatMessage, "id" | "timestamp">) => void;
-  seedChatMessages: (sessionId: string, msgs: Omit<ChatMessage, "id" | "timestamp">[]) => void;
 }
 
 export const useStore = create<StreetLivesStore>()(
@@ -375,19 +364,6 @@ export const useStore = create<StreetLivesStore>()(
           chatMessages: {
             ...state.chatMessages,
             [sessionId]: [...(state.chatMessages[sessionId] ?? []), message],
-          },
-        }));
-      },
-      seedChatMessages: (sessionId, msgs) => {
-        const messages: ChatMessage[] = msgs.map((m) => ({
-          ...m,
-          id: crypto.randomUUID(),
-          timestamp: new Date().toISOString(),
-        }));
-        set((state) => ({
-          chatMessages: {
-            ...state.chatMessages,
-            [sessionId]: [...(state.chatMessages[sessionId] ?? []), ...messages],
           },
         }));
       },
