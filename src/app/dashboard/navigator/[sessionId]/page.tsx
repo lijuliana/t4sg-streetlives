@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useParams } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, MessageSquare, Circle, UserPlus, ArrowRight, CheckCircle, RotateCcw } from "lucide-react";
+import { Plus, Circle, UserPlus, ArrowRight, CheckCircle, RotateCcw } from "lucide-react";
 import moment from "moment";
 import { useStore } from "@/lib/store";
 import type { SessionEvent, SessionLog } from "@/lib/store";
@@ -11,6 +11,11 @@ import DashboardShell from "@/components/DashboardShell";
 import SessionStatusBadge from "@/components/SessionStatusBadge";
 import ReferralCard from "@/components/ReferralCard";
 import ReferralForm from "@/components/ReferralForm";
+import NavigatorChatPanel from "@/components/NavigatorChatPanel";
+
+const CHAT_MIN_WIDTH = 300;
+const CHAT_MAX_WIDTH = 640;
+const CHAT_DEFAULT_WIDTH = 420;
 
 const DEMO_NAVIGATOR_ID = "nav-1";
 
@@ -65,7 +70,6 @@ function TimelineEvent({ event }: { event: SessionEvent }) {
 
 export default function NavigatorSessionDetailPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
-  const router = useRouter();
 
   const getSessionById = useStore((s) => s.getSessionById);
   const navigators = useStore((s) => s.navigators);
@@ -95,6 +99,44 @@ export default function NavigatorSessionDetailPage() {
 
   // Supervisor review state
   const [coachingNote, setCoachingNote] = useState(session?.supervisorNote ?? "");
+
+  // Chat slide panel
+  const [chatOpen, setChatOpen] = useState(true);
+  const chatPanelRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  const dragStartX = useRef(0);
+  const dragStartWidth = useRef(0);
+
+  useEffect(() => {
+    if (chatOpen && chatPanelRef.current) {
+      const half = Math.round(chatPanelRef.current.parentElement!.offsetWidth / 2);
+      chatPanelRef.current.style.width = `${half}px`;
+      dragStartWidth.current = half;
+    }
+  }, [chatOpen]);
+
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    isDragging.current = true;
+    dragStartX.current = e.clientX;
+    dragStartWidth.current = chatPanelRef.current?.offsetWidth ?? CHAT_DEFAULT_WIDTH;
+    e.preventDefault();
+  }, []);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current || !chatPanelRef.current) return;
+      const delta = dragStartX.current - e.clientX;
+      const newWidth = Math.min(CHAT_MAX_WIDTH, Math.max(CHAT_MIN_WIDTH, dragStartWidth.current + delta));
+      chatPanelRef.current.style.width = `${newWidth}px`;
+    };
+    const onMouseUp = () => { isDragging.current = false; };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
 
   if (!session) {
     return (
@@ -136,22 +178,12 @@ export default function NavigatorSessionDetailPage() {
       title={`#${session.id.slice(-5).toUpperCase()}`}
       role={isSupervisor ? "supervisor" : "navigator"}
       backHref={isSupervisor ? "/dashboard/supervisor" : "/dashboard/navigator"}
-      action={
-        <button
-          type="button"
-          onClick={() => router.push(`/dashboard/navigator/${sessionId}/chat`)}
-          className="flex items-center gap-1.5 text-xs font-medium bg-brand-yellow text-gray-900 px-3 py-1.5 rounded-md hover:brightness-95 transition"
-        >
-          <MessageSquare size={13} strokeWidth={2} />
-          {isSupervisor ? "Transcript" : "Open Chat"}
-          {chatMessageCount > 0 && (
-            <span className="bg-gray-900 text-white text-[10px] font-medium px-1.5 py-0.5 rounded-full leading-none">
-              {chatMessageCount}
-            </span>
-          )}
-        </button>
-      }
+      fullWidth
     >
+      <div className="flex h-full overflow-hidden">
+        {/* Detail content */}
+        <div className="flex-1 min-w-0 overflow-y-auto px-6 py-5 space-y-5 pb-10">
+
       {/* Session header */}
       <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-3">
         <div className="flex items-center justify-between">
@@ -555,11 +587,33 @@ export default function NavigatorSessionDetailPage() {
         </div>
       )}
 
-      <ReferralForm
-        sessionId={session.id}
-        open={referralOpen}
-        onClose={() => setReferralOpen(false)}
-      />
+        <ReferralForm
+          sessionId={session.id}
+          open={referralOpen}
+          onClose={() => setReferralOpen(false)}
+        />
+        </div>{/* end detail content */}
+
+        {/* Chat panel with drag-to-resize */}
+        {chatOpen && (
+          <>
+            <div
+              onMouseDown={handleDragStart}
+              className="w-1 flex-shrink-0 bg-gray-200 hover:bg-brand-yellow cursor-col-resize transition-colors select-none"
+              title="Drag to resize"
+            />
+            <div
+              ref={chatPanelRef}
+              className="flex-shrink-0 border-l border-gray-200 overflow-hidden flex flex-col"
+            >
+              <NavigatorChatPanel
+                sessionId={sessionId}
+                onClose={() => setChatOpen(false)}
+              />
+            </div>
+          </>
+        )}
+      </div>{/* end flex row */}
     </DashboardShell>
   );
 }

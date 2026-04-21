@@ -1,4 +1,5 @@
 import React, { useState, KeyboardEvent } from "react";
+import styles from "../styles/components/ChatInput.module.css";
 
 interface ChatInputProps {
   onSend: (text: string) => Promise<void>;
@@ -29,16 +30,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled = false }) => {
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: "10px",
-        alignItems: "flex-end",
-        padding: "16px 20px",
-        borderTop: "1px solid #2a2a2a",
-        background: "#111",
-      }}
-    >
+    <div className={styles.inputContainer}>
       <textarea
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -46,42 +38,13 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled = false }) => {
         placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
         disabled={disabled || sending}
         rows={1}
-        style={{
-          flex: 1,
-          resize: "none",
-          border: "1.5px solid #2a2a2a",
-          borderRadius: "12px",
-          padding: "10px 14px",
-          fontSize: "14px",
-          fontFamily: "'DM Sans', sans-serif",
-          outline: "none",
-          lineHeight: "1.5",
-          transition: "border-color 0.15s",
-          color: "#fff",
-          backgroundColor: disabled ? "#1a1a1a" : "#1e1e1e",
-        }}
-        onFocus={(e) => (e.target.style.borderColor = "#f5c800")}
-        onBlur={(e) => (e.target.style.borderColor = "#2a2a2a")}
+        className={styles.textarea}
       />
       <button
+        type="button"
         onClick={handleSend}
         disabled={disabled || sending || !value.trim()}
-        style={{
-          flexShrink: 0,
-          padding: "10px 20px",
-          borderRadius: "12px",
-          border: "none",
-          background:
-            disabled || sending || !value.trim() ? "#2a2a2a" : "#f5c800",
-          color: disabled || sending || !value.trim() ? "#555" : "#111",
-          fontSize: "14px",
-          fontWeight: 600,
-          fontFamily: "'DM Sans', sans-serif",
-          cursor:
-            disabled || sending || !value.trim() ? "not-allowed" : "pointer",
-          transition: "background 0.15s, color 0.15s",
-          height: "42px",
-        }}
+        className={styles.sendButton}
       >
         {sending ? "…" : "Send"}
       </button>

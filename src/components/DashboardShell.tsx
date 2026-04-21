@@ -23,16 +23,17 @@ interface Props {
   backHref?: string;
   action?: React.ReactNode;
   children: React.ReactNode;
+  fullWidth?: boolean;
 }
 
-export default function DashboardShell({ title, role, backHref, action, children }: Props) {
+export default function DashboardShell({ title, role, backHref, action, children, fullWidth }: Props) {
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col pb-14">
+    <div className={fullWidth ? "h-screen bg-gray-50 flex flex-col overflow-hidden" : "min-h-screen bg-gray-50 flex flex-col pb-14"}>
       {/* Header */}
       <header className="bg-white border-b border-gray-200 flex-shrink-0 sticky top-0 z-30">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
+        <div className={fullWidth ? "px-6 py-3 flex items-center gap-3" : "max-w-lg mx-auto px-4 py-3 flex items-center gap-3"}>
           {backHref && (
             <button
               type="button"
@@ -56,13 +57,13 @@ export default function DashboardShell({ title, role, backHref, action, children
           <div className="flex-1" />
           {action}
         </div>
-        <div className="max-w-lg mx-auto px-4 pb-3">
+        <div className={fullWidth ? "px-6 pb-3" : "max-w-lg mx-auto px-4 pb-3"}>
           <h1 className="text-xl font-normal text-gray-900">{title}</h1>
         </div>
       </header>
 
       {/* Body */}
-      <main className="flex-1 max-w-lg mx-auto w-full px-4 py-5 space-y-5">
+      <main className={fullWidth ? "flex-1 w-full overflow-hidden" : "flex-1 max-w-lg mx-auto w-full px-4 py-5 space-y-5"}>
         {children}
       </main>
     </div>
