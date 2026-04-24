@@ -162,6 +162,21 @@ export function ChatContent() {
           stopPolling();
           setChatState("closed");
           localStorage.setItem("sl_session_state", "closed");
+          // Archive to past sessions so the user dashboard can show the transcript
+          const sid = localStorage.getItem("sl_session_id");
+          const stok = localStorage.getItem("sl_session_token");
+          if (sid && stok) {
+            const past = JSON.parse(localStorage.getItem("sl_past_sessions") ?? "[]");
+            if (!past.find((p: { id: string }) => p.id === sid)) {
+              past.unshift({
+                id: sid,
+                token: stok,
+                need_category: localStorage.getItem("sl_session_need_category") ?? "other",
+                created_at: localStorage.getItem("sl_session_created_at") ?? new Date().toISOString(),
+              });
+              localStorage.setItem("sl_past_sessions", JSON.stringify(past));
+            }
+          }
         }
       } catch {
         // non-fatal
@@ -187,6 +202,8 @@ export function ChatContent() {
       setSessionToken(token);
       localStorage.setItem("sl_session_id", id);
       localStorage.setItem("sl_session_token", token);
+      localStorage.setItem("sl_session_need_category", needCategory);
+      localStorage.setItem("sl_session_created_at", new Date().toISOString());
 
       if (status === "active") {
         setChatState("live");
@@ -238,6 +255,8 @@ export function ChatContent() {
     localStorage.removeItem("sl_session_id");
     localStorage.removeItem("sl_session_token");
     localStorage.removeItem("sl_session_state");
+    localStorage.removeItem("sl_session_need_category");
+    localStorage.removeItem("sl_session_created_at");
     window.location.reload();
   };
 

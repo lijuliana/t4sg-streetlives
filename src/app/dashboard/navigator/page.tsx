@@ -15,6 +15,7 @@ interface RealSession {
   created_at: string;
   closed_at: string | null;
   routing_reason: object | null;
+  submitted_for_review: boolean | null;
 }
 
 interface NavProfile {
@@ -35,7 +36,7 @@ function SessionRow({ session }: { session: RealSession }) {
   const status = mapStatus(session.status);
   return (
     <Link
-      href={`/dashboard/navigator/${session.id}/chat`}
+      href={`/dashboard/navigator/${session.id}`}
       className="block bg-white border border-gray-200 rounded-xl px-4 py-3.5 hover:border-gray-300 hover:shadow-md transition"
     >
       <div className="flex items-center gap-3">
@@ -94,13 +95,16 @@ export default async function NavigatorDashboardPage() {
   const byRecent = (a: RealSession, b: RealSession) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
 
+  // Navigator only receives their own sessions from the Lambda (role-filtered),
+  // but unassigned sessions have navigator_id=null so they come through too.
   const mySessions = myProfile
     ? allSessions.filter((s) => s.navigator_id === myProfile.id)
     : [];
 
-  const newRequests = allSessions.filter((s) => s.navigator_id === null).sort(byRecent);
+  const unassigned = allSessions.filter((s) => s.navigator_id === null).sort(byRecent);
   const active = mySessions.filter((s) => s.status !== "closed").sort(byRecent);
-  const past = mySessions.filter((s) => s.status === "closed").sort(byRecent);
+  // Closed = submitted for review (closed and sent to supervisor)
+  const closed = mySessions.filter((s) => s.status === "closed").sort(byRecent);
 
   return (
     <DashboardShell title="My Sessions" role="navigator">
@@ -118,14 +122,14 @@ export default async function NavigatorDashboardPage() {
         </div>
         <div className="w-px bg-gray-200" />
         <div className="flex-1 text-center">
-          <p className={`text-2xl font-normal mt-0.5 ${newRequests.length > 0 ? "text-amber-600" : "text-gray-900"}`}>
-            {newRequests.length}
+          <p className={`text-2xl font-normal mt-0.5 ${unassigned.length > 0 ? "text-amber-600" : "text-gray-900"}`}>
+            {unassigned.length}
           </p>
-          <p className="text-xs text-amber-600 font-medium mt-0.5">New Requests</p>
+          <p className="text-xs text-amber-600 font-medium mt-0.5">Unassigned</p>
         </div>
         <div className="w-px bg-gray-200" />
         <div className="flex-1 text-center">
-          <p className="text-2xl font-normal text-gray-900">{past.length}</p>
+          <p className="text-2xl font-normal text-gray-900">{closed.length}</p>
           <p className="text-xs text-gray-400 font-medium mt-0.5">Closed</p>
         </div>
       </div>
@@ -144,27 +148,27 @@ export default async function NavigatorDashboardPage() {
       </section>
 
       <section>
-        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">New Requests</h2>
-        {newRequests.length === 0 ? (
+        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Unassigned</h2>
+        {unassigned.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center">
-            <p className="text-sm text-gray-400">No new requests</p>
+            <p className="text-sm text-gray-400">No unassigned sessions</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {newRequests.map((s) => <SessionRow key={s.id} session={s} />)}
+            {unassigned.map((s) => <SessionRow key={s.id} session={s} />)}
           </div>
         )}
       </section>
 
       <section>
-        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Past Sessions</h2>
-        {past.length === 0 ? (
+        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Closed</h2>
+        {closed.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center">
             <p className="text-sm text-gray-400">No closed sessions yet</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {past.map((s) => <SessionRow key={s.id} session={s} />)}
+            {closed.map((s) => <SessionRow key={s.id} session={s} />)}
           </div>
         )}
       </section>
