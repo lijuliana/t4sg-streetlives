@@ -68,6 +68,8 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
+    // Skip all Next internals (including /_next/webpack-hmr in dev). Running Auth0
+    // middleware on those routes can break HMR / chunk loading → blank unstyled UI.
+    "/((?!_next/|favicon.ico|sitemap.xml|robots.txt).*)",
   ],
 };
