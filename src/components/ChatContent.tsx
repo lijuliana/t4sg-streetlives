@@ -235,6 +235,10 @@ export function ChatContent({ onClose }: ChatContentProps) {
 
   const handleEndChat = () => {
     stopPolling();
+    if (onClose) {
+      onClose();
+      return;
+    }
     router.push("/");
   };
 
