@@ -47,7 +47,7 @@ export default function NewPostForm() {
           placeholder="Share something with the community…"
           rows={6}
           className={cn(
-            "w-full rounded-xl border px-4 py-3 text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:border-transparent transition",
+            "w-full rounded-md border px-4 py-3 text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-brand-yellow focus:border-transparent transition",
             errors.content ? "border-red-400" : "border-gray-300"
           )}
         />
@@ -71,7 +71,7 @@ export default function NewPostForm() {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full bg-brand-yellow text-gray-900 font-medium py-3 rounded-xl hover:brightness-95 transition disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-full bg-brand-yellow text-gray-900 font-medium py-3 rounded-md hover:brightness-95 transition disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {isSubmitting ? "Posting…" : "Post"}
       </button>

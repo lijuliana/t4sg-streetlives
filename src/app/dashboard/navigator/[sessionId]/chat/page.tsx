@@ -168,7 +168,7 @@ export default function NavigatorChatPage() {
         <div key={msg.id} className={cn("flex gap-3 mb-3 max-w-[80%]", !showAvatar && "pl-13")}>
           {showAvatar ? <UserAvatar /> : <div className="w-10 flex-shrink-0" />}
           <div className="flex flex-col">
-            <div className="bg-white text-gray-900 text-sm px-4 py-2.5 rounded-2xl rounded-tl-sm shadow-sm w-fit">
+            <div className="bg-white text-gray-900 text-sm px-4 py-2.5 rounded-md rounded-tl-sm shadow-sm w-fit">
               {msg.content}
             </div>
             <span className="text-[10px] text-gray-400 mt-1 ml-1">{ts}</span>

@@ -1,0 +1,297 @@
+/* ── Page root ── */
+.pageRoot {
+  min-height: 100vh;
+  font-family: 'DM Sans', sans-serif;
+  color: #111;
+}
+
+/* ── Header ── */
+.pageHeader {
+  background: #111;
+  border-bottom: 1px solid #1f2937;
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pageHeaderTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.pageHeaderSubtitle {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.pageHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.pageHeaderCount {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.headerRefreshButton {
+  background: none;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 5px 12px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.navLink {
+  font-size: 12px;
+  color: #f5c800;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+/* ── Content area ── */
+.content {
+  padding: 24px 32px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* ── Session summary strip ── */
+.sessionStrip {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.sessionCard {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 14px;
+  min-width: 160px;
+}
+
+.sessionCardId {
+  font-size: 12px;
+  font-family: 'DM Mono', monospace;
+  font-weight: 600;
+  color: #111;
+  margin-bottom: 4px;
+}
+
+.sessionCardPill {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-family: 'DM Mono', monospace;
+}
+
+.sessionCardPill[data-status="active"] {
+  background: #f5c800;
+  color: #111;
+}
+
+.sessionCardPill[data-status="unassigned"] {
+  background: #f59e0b;
+  color: #111;
+}
+
+.sessionCardPill[data-status="closed"] {
+  background: #374151;
+  color: #9ca3af;
+}
+
+.sessionCardPill[data-status="transferred"] {
+  background: #6366f1;
+  color: #fff;
+}
+
+.sessionCardCategory {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
+.sessionCardDate {
+  font-size: 10px;
+  color: #d1d5db;
+  margin-top: 2px;
+}
+
+.noSessions {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+/* ── Filter tabs ── */
+.filterRow {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.filterButton {
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  text-transform: capitalize;
+}
+
+.filterButton[data-active="true"] {
+  border-color: #111;
+  background: #111;
+  color: #fff;
+}
+
+/* ── Error banner ── */
+.errorBanner {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #b91c1c;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+/* ── Events table ── */
+.eventsTable {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 140px 90px 160px 1fr 160px;
+  gap: 0;
+  padding: 10px 16px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.tableLoading {
+  padding: 24px 16px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.tableEmpty {
+  padding: 24px 16px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.eventTableRow {
+  display: grid;
+  grid-template-columns: 140px 90px 160px 1fr 160px;
+  gap: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  align-items: center;
+}
+
+.eventTableRow:last-child {
+  border-bottom: none;
+}
+
+/* Even/odd striping via nth-child */
+.eventTableRow:nth-child(even) {
+  background: #fafafa;
+}
+
+.eventTableRow:nth-child(odd) {
+  background: #fff;
+}
+
+/* Dynamic left border by event type */
+.eventTableRow[data-event-type="created"] {
+  border-left: 3px solid #6b7280;
+}
+.eventTableRow[data-event-type="assigned"] {
+  border-left: 3px solid #22c55e;
+}
+.eventTableRow[data-event-type="transferred"] {
+  border-left: 3px solid #6366f1;
+}
+.eventTableRow[data-event-type="closed"] {
+  border-left: 3px solid #374151;
+}
+
+/* ── Table cells ── */
+.cellSessionId {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #111;
+}
+
+.cellSessionStatus {
+  font-size: 10px;
+  color: #9ca3af;
+  margin-top: 1px;
+}
+
+.cellEventType {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-family: 'DM Mono', monospace;
+}
+
+.cellEventType[data-event-type="created"] { color: #6b7280; }
+.cellEventType[data-event-type="assigned"] { color: #22c55e; }
+.cellEventType[data-event-type="transferred"] { color: #6366f1; }
+.cellEventType[data-event-type="closed"] { color: #374151; }
+
+.cellTime {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.cellMeta {
+  font-size: 11px;
+  color: #374151;
+  font-family: 'DM Mono', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cellActor {
+  font-size: 12px;
+  color: #9ca3af;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellActor[data-has-actor="true"] {
+  font-family: 'DM Mono', monospace;
+}

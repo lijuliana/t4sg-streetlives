@@ -18,7 +18,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={inter.variable}>
-      <body className="min-h-screen bg-gray-50 font-sans">
+      <body className="min-h-screen bg-gray-50 font-sans" suppressHydrationWarning>
         {children}
         <Toaster position="top-center" richColors />
         <StoreSync />

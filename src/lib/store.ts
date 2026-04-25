@@ -59,7 +59,7 @@ export interface ChatMessage {
 
 export interface SessionEvent {
   id: string;
-  type: "created" | "assigned" | "transferred" | "closed";
+  type: "created" | "assigned" | "transferred" | "closed" | "returned";
   actorName: string;
   timestamp: string;
   note?: string;
@@ -89,6 +89,10 @@ export interface Session {
   events: SessionEvent[];
   logged?: boolean;
   sessionLog?: SessionLog;
+  reviewStatus?: "submitted" | "approved" | "returned";
+  supervisorNote?: string;
+  supervisorReturnNote?: string;
+  reviewedAt?: string;
 }
 
 function routeSession(needCategory: string, navigators: Navigator[], sessions: Session[]): string | null {
@@ -128,6 +132,9 @@ interface StreetLivesStore {
   transferSession: (sessionId: string, navigatorId: string) => void;
   rerouteSession: (sessionId: string) => void;
   logSession: (sessionId: string, log: SessionLog) => void;
+  submitForReview: (sessionId: string) => void;
+  approveSession: (sessionId: string, note: string) => void;
+  returnSession: (sessionId: string, note: string) => void;
 
   addReferral: (
     sessionId: string,
@@ -280,6 +287,40 @@ export const useStore = create<StreetLivesStore>()(
           ),
         })),
 
+      submitForReview: (sessionId) =>
+        set((state) => ({
+          sessions: state.sessions.map((s) =>
+            s.id === sessionId ? { ...s, reviewStatus: "submitted" } : s
+          ),
+        })),
+
+      approveSession: (sessionId, note) =>
+        set((state) => ({
+          sessions: state.sessions.map((s) =>
+            s.id === sessionId
+              ? { ...s, reviewStatus: "approved", supervisorNote: note, reviewedAt: new Date().toISOString() }
+              : s
+          ),
+        })),
+
+      returnSession: (sessionId, note) =>
+        set((state) => ({
+          sessions: state.sessions.map((s) => {
+            if (s.id !== sessionId) return s;
+            const now = new Date().toISOString();
+            return {
+              ...s,
+              reviewStatus: "returned",
+              supervisorReturnNote: note,
+              status: "active",
+              events: [
+                ...s.events,
+                { id: crypto.randomUUID(), type: "returned" as const, actorName: "Supervisor", timestamp: now, note: note || undefined },
+              ],
+            };
+          }),
+        })),
+
       addReferral: (sessionId, partial) => {
         const referral: Referral = {
           ...partial,
@@ -328,7 +369,7 @@ export const useStore = create<StreetLivesStore>()(
       },
     }),
     {
-      name: "streetlives-store-v5",
+      name: "streetlives-store-v10",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         sessions: state.sessions,

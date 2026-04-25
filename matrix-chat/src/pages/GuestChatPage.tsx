@@ -3,6 +3,7 @@ import ChatMessage from "../components/ChatMessage";
 import type { Message as ChatMessageShape } from "../components/ChatMessage";
 import ChatInput from "../components/ChatInput";
 import type { GuestSession } from "../lib/guestSession";
+import styles from "../styles/pages/GuestChatPage.module.css";
 
 // ── Backend message shape ─────────────────────────────────────────────────────
 interface BackendMessage {
@@ -109,8 +110,6 @@ const GuestChatPage: React.FC<GuestChatPageProps> = ({ session, onError }) => {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(data.error ?? `Send failed (${res.status})`);
       }
-      // Backend now returns a SessionMessage shape (id, senderType, text, createdAt),
-      // not the legacy BackendMessage shape. Map it manually before display.
       const raw = (await res.json()) as {
         id?: string;
         senderType?: string;
@@ -137,167 +136,65 @@ const GuestChatPage: React.FC<GuestChatPageProps> = ({ session, onError }) => {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;600&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { height: 100%; }
-        body {
-          background: #1a1a1a;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 100vh;
-        }
-        .chat-messages { scrollbar-width: thin; scrollbar-color: transparent transparent; transition: scrollbar-color 0.3s; }
-        .chat-messages:hover { scrollbar-color: rgba(0,0,0,0.18) transparent; }
-        .chat-messages::-webkit-scrollbar { width: 4px; }
-        .chat-messages::-webkit-scrollbar-track { background: transparent; }
-        .chat-messages::-webkit-scrollbar-thumb { background: transparent; border-radius: 2px; transition: background 0.3s; }
-        .chat-messages:hover::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); }
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
-
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          width: "min(1100px, 92vw)",
-          height: "92vh",
-          borderRadius: "14px",
-          overflow: "hidden",
-          fontFamily: "'DM Sans', sans-serif",
-          background: "#fff",
-          boxShadow: "0 8px 48px rgba(0,0,0,0.5)",
-        }}
-      >
-        {/* ── Header ── */}
-        <div
-          style={{
-            padding: "18px 24px",
-            borderBottom: "1px solid #e2e8f0",
-            background: "#111",
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-          }}
-        >
-          <div
-            style={{
-              width: "36px",
-              height: "36px",
-              borderRadius: "10px",
-              background: "#f5c800",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-            }}
-          >
-            <span style={{ fontSize: "18px" }}>💬</span>
-          </div>
-          <div>
-            <h1
-              style={{
-                fontSize: "16px",
-                fontWeight: 700,
-                color: "#fff",
-                letterSpacing: "-0.01em",
-              }}
-            >
-              Chat with Navigator
-            </h1>
-            <p
-              style={{
-                fontSize: "11px",
-                color: "#6b7280",
-                marginTop: "2px",
-                fontFamily: "'DM Mono', monospace",
-              }}
-            >
-              #{sessionId.slice(0, 8)}
-            </p>
-          </div>
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px" }}>
-            <SessionStatusBadge status={session.status} />
-            <StatusBadge state={uiState} />
-          </div>
+    <div className={styles.chatShell}>
+      {/* ── Header ── */}
+      <div className={styles.header}>
+        <div className={styles.headerIcon}>
+          <span className={styles.headerIconEmoji}>💬</span>
         </div>
-
-        {/* ── Message area ── */}
-        <div
-          className="chat-messages"
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "20px 24px",
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          {uiState === "loading" && (
-            <CenteredNotice>
-              <Spinner />
-              <span style={{ marginLeft: "10px", color: "#64748b" }}>
-                Starting your chat…
-              </span>
-            </CenteredNotice>
-          )}
-
-          {uiState === "error" && errorMsg && (
-            <div
-              style={{
-                background: "#fef2f2",
-                border: "1px solid #fecaca",
-                borderRadius: "10px",
-                padding: "14px 18px",
-                color: "#b91c1c",
-                fontSize: "14px",
-              }}
-            >
-              <strong>Connection error:</strong> {errorMsg}
-            </div>
-          )}
-
-          {uiState === "ready" && messages.length === 0 && (
-            <CenteredNotice>
-              <span style={{ color: "#94a3b8", fontSize: "14px" }}>
-                You're connected. A Navigator will join shortly.
-              </span>
-            </CenteredNotice>
-          )}
-
-          {messages.map((msg) => (
-            <ChatMessage
-              key={msg.eventId}
-              message={msg}
-              isNavigator={msg.sender === "service"}
-              isOwnMessage={msg.sender === "guest"}
-            />
-          ))}
-
-          <div ref={bottomRef} />
+        <div>
+          <h1 className={styles.headerTitle}>Chat with Navigator</h1>
+          <p className={styles.headerSessionId}>#{sessionId.slice(0, 8)}</p>
         </div>
+        <div className={styles.headerActions}>
+          <SessionStatusBadge status={session.status} />
+          <StatusBadge state={uiState} />
+        </div>
+      </div>
 
-        {/* ── Send error banner ── */}
-        {sendError && (
-          <div
-            style={{
-              padding: "8px 24px",
-              background: "#fef2f2",
-              color: "#b91c1c",
-              fontSize: "13px",
-              borderTop: "1px solid #fecaca",
-            }}
-          >
-            {sendError}
+      {/* ── Message area ── */}
+      <div className={styles.messageArea}>
+        {uiState === "loading" && (
+          <CenteredNotice>
+            <Spinner />
+            <span className={styles.connectingText}>Starting your chat…</span>
+          </CenteredNotice>
+        )}
+
+        {uiState === "error" && errorMsg && (
+          <div className={styles.errorBlock}>
+            <strong>Connection error:</strong> {errorMsg}
           </div>
         )}
 
-        {/* ── Input ── */}
-        <ChatInput onSend={handleSend} disabled={uiState !== "ready"} />
+        {uiState === "ready" && messages.length === 0 && (
+          <CenteredNotice>
+            <span className={styles.emptyText}>
+              You're connected. A Navigator will join shortly.
+            </span>
+          </CenteredNotice>
+        )}
+
+        {messages.map((msg) => (
+          <ChatMessage
+            key={msg.eventId}
+            message={msg}
+            isNavigator={msg.sender === "service"}
+            isOwnMessage={msg.sender === "guest"}
+          />
+        ))}
+
+        <div ref={bottomRef} />
       </div>
-    </>
+
+      {/* ── Send error banner ── */}
+      {sendError && (
+        <div className={styles.sendErrorBanner}>{sendError}</div>
+      )}
+
+      {/* ── Input ── */}
+      <ChatInput onSend={handleSend} disabled={uiState !== "ready"} />
+    </div>
   );
 };
 
@@ -305,74 +202,32 @@ const GuestChatPage: React.FC<GuestChatPageProps> = ({ session, onError }) => {
 
 const SessionStatusBadge: React.FC<{ status: GuestSession["status"] }> = ({ status }) => (
   <span
-    style={{
-      fontSize: "11px",
-      fontWeight: 600,
-      letterSpacing: "0.04em",
-      color: status === "active" ? "#6b7280" : "#9ca3af",
-      background: "#1f2937",
-      borderRadius: "6px",
-      padding: "3px 9px",
-      fontFamily: "'DM Mono', monospace",
-      textTransform: "uppercase",
-    }}
+    className={styles.sessionStatusBadge}
+    data-status={status}
   >
     {status}
   </span>
 );
 
 const StatusBadge: React.FC<{ state: UIState }> = ({ state }) => {
-  const map: Record<UIState, { label: string; color: string; bg: string }> = {
-    loading: { label: "Connecting…", color: "#111", bg: "#f5c800" },
-    ready: { label: "Connected", color: "#111", bg: "#f5c800" },
-    error: { label: "Error", color: "#fca5a5", bg: "#7f1d1d" },
+  const labels: Record<UIState, string> = {
+    loading: "Connecting…",
+    ready: "Connected",
+    error: "Error",
   };
-  const { label, color, bg } = map[state];
   return (
-    <span
-      style={{
-        fontSize: "11px",
-        fontWeight: 600,
-        letterSpacing: "0.04em",
-        color,
-        background: bg,
-        borderRadius: "6px",
-        padding: "3px 9px",
-        fontFamily: "'DM Mono', monospace",
-      }}
-    >
-      {label}
+    <span className={styles.statusBadge} data-state={state}>
+      {labels[state]}
     </span>
   );
 };
 
-const CenteredNotice: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => (
-  <div
-    style={{
-      flex: 1,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-    }}
-  >
-    {children}
-  </div>
+const CenteredNotice: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className={styles.centeredNotice}>{children}</div>
 );
 
 const Spinner: React.FC = () => (
-  <span
-    style={{
-      display: "inline-block",
-      width: "16px",
-      height: "16px",
-      border: "2px solid #e2e8f0",
-      borderTopColor: "#f5c800",
-      borderRadius: "50%",
-      animation: "spin 0.8s linear infinite",
-    }}
-  />
+  <span className={styles.spinner} />
 );
 
 export default GuestChatPage;

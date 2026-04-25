@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import styles from "../styles/pages/SupervisorPage.module.css";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -41,22 +42,6 @@ async function apiFetch<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-const EVENT_COLOR: Record<EventType, string> = {
-  created:     "#6b7280",
-  assigned:    "#22c55e",
-  transferred: "#6366f1",
-  closed:      "#374151",
-};
-
-const STATUS_COLOR: Record<SessionStatus, { bg: string; color: string }> = {
-  active:      { bg: "#f5c800", color: "#111" },
-  unassigned:  { bg: "#f59e0b", color: "#111" },
-  closed:      { bg: "#374151", color: "#9ca3af" },
-  transferred: { bg: "#6366f1", color: "#fff" },
-};
-
 // ── Supervisor Page ───────────────────────────────────────────────────────────
 
 const SupervisorPage: React.FC = () => {
@@ -94,319 +79,160 @@ const SupervisorPage: React.FC = () => {
   const filtered = filter === "all" ? events : events.filter((e) => e.eventType === filter);
 
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;600&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { height: 100%; background: #1a1a1a; }
-      `}</style>
-
-      <div
-        style={{
-          minHeight: "100vh",
-          fontFamily: "'DM Sans', sans-serif",
-          color: "#111",
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            background: "#111",
-            borderBottom: "1px solid #1f2937",
-            padding: "16px 32px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <div>
-            <div style={{ fontSize: "14px", fontWeight: 700, color: "#fff" }}>
-              Supervisor View
-            </div>
-            <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "2px" }}>
-              Cross-session audit log · refreshes every 15s
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <div style={{ fontSize: "12px", color: "#6b7280" }}>
-              {sessions.length} sessions · {events.length} events
-            </div>
-            <button
-              onClick={load}
-              style={{
-                background: "none",
-                border: "1px solid #374151",
-                borderRadius: "6px",
-                color: "#9ca3af",
-                cursor: "pointer",
-                fontSize: "12px",
-                padding: "5px 12px",
-                fontFamily: "'DM Sans', sans-serif",
-              }}
-            >
-              ↻ Refresh
-            </button>
-            <a
-              href="/navigator"
-              style={{
-                fontSize: "12px",
-                color: "#f5c800",
-                textDecoration: "none",
-                fontWeight: 600,
-              }}
-            >
-              ← Navigator Dashboard
-            </a>
+    <div className={styles.pageRoot}>
+      {/* Header */}
+      <div className={styles.pageHeader}>
+        <div>
+          <div className={styles.pageHeaderTitle}>Supervisor View</div>
+          <div className={styles.pageHeaderSubtitle}>
+            Cross-session audit log · refreshes every 15s
           </div>
         </div>
-
-        <div style={{ padding: "24px 32px", maxWidth: "1200px", margin: "0 auto" }}>
-          {/* Session summary strip */}
-          <div
-            style={{
-              display: "flex",
-              gap: "10px",
-              flexWrap: "wrap",
-              marginBottom: "24px",
-            }}
-          >
-            {sessions.map((s) => {
-              const { bg, color } = STATUS_COLOR[s.status] ?? STATUS_COLOR.closed;
-              return (
-                <div
-                  key={s.sessionId}
-                  style={{
-                    background: "#fff",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "8px",
-                    padding: "10px 14px",
-                    minWidth: "160px",
-                  }}
-                >
-                  <div style={{ fontSize: "12px", fontFamily: "'DM Mono', monospace", fontWeight: 600, color: "#111", marginBottom: "4px" }}>
-                    #{s.sessionId.slice(0, 8)}
-                  </div>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      fontSize: "10px",
-                      fontWeight: 700,
-                      letterSpacing: "0.06em",
-                      textTransform: "uppercase",
-                      padding: "2px 7px",
-                      borderRadius: "4px",
-                      background: bg,
-                      color,
-                      fontFamily: "'DM Mono', monospace",
-                    }}
-                  >
-                    {s.status}
-                  </span>
-                  {s.needCategory && (
-                    <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "4px" }}>
-                      {s.needCategory}
-                    </div>
-                  )}
-                  <div style={{ fontSize: "10px", color: "#d1d5db", marginTop: "2px" }}>
-                    {fmt(s.createdAt)}
-                  </div>
-                </div>
-              );
-            })}
-            {!loading && sessions.length === 0 && (
-              <p style={{ fontSize: "13px", color: "#9ca3af" }}>No sessions yet.</p>
-            )}
+        <div className={styles.pageHeaderActions}>
+          <div className={styles.pageHeaderCount}>
+            {sessions.length} sessions · {events.length} events
           </div>
-
-          {/* Filter tabs */}
-          <div
-            style={{
-              display: "flex",
-              gap: "6px",
-              marginBottom: "16px",
-              flexWrap: "wrap",
-            }}
+          <button
+            type="button"
+            onClick={load}
+            className={styles.headerRefreshButton}
           >
-            {(["all", "created", "assigned", "transferred", "closed"] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                style={{
-                  padding: "5px 14px",
-                  borderRadius: "6px",
-                  border: "1px solid",
-                  borderColor: filter === f ? "#111" : "#e5e7eb",
-                  background: filter === f ? "#111" : "#fff",
-                  color: filter === f ? "#fff" : "#374151",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontFamily: "'DM Sans', sans-serif",
-                  textTransform: "capitalize",
-                }}
+            ↻ Refresh
+          </button>
+          <a href="/navigator" className={styles.navLink}>
+            ← Navigator Dashboard
+          </a>
+        </div>
+      </div>
+
+      <div className={styles.content}>
+        {/* Session summary strip */}
+        <div className={styles.sessionStrip}>
+          {sessions.map((s) => (
+            <div key={s.sessionId} className={styles.sessionCard}>
+              <div className={styles.sessionCardId}>
+                #{s.sessionId.slice(0, 8)}
+              </div>
+              <span
+                className={styles.sessionCardPill}
+                data-status={s.status}
               >
-                {f === "all" ? `All (${events.length})` : f}
-              </button>
-            ))}
+                {s.status}
+              </span>
+              {s.needCategory && (
+                <div className={styles.sessionCardCategory}>
+                  {s.needCategory}
+                </div>
+              )}
+              <div className={styles.sessionCardDate}>{fmt(s.createdAt)}</div>
+            </div>
+          ))}
+          {!loading && sessions.length === 0 && (
+            <p className={styles.noSessions}>No sessions yet.</p>
+          )}
+        </div>
+
+        {/* Filter tabs */}
+        <div className={styles.filterRow}>
+          {(["all", "created", "assigned", "transferred", "closed"] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFilter(f)}
+              className={styles.filterButton}
+              data-active={String(filter === f)}
+            >
+              {f === "all" ? `All (${events.length})` : f}
+            </button>
+          ))}
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className={styles.errorBanner}>{error}</div>
+        )}
+
+        {/* Events table */}
+        <div className={styles.eventsTable}>
+          {/* Table header */}
+          <div className={styles.tableHeader}>
+            <span>Session</span>
+            <span>Event</span>
+            <span>Time</span>
+            <span>Metadata</span>
+            <span>Actor</span>
           </div>
 
-          {/* Error */}
-          {error && (
-            <div
-              style={{
-                background: "#fef2f2",
-                border: "1px solid #fecaca",
-                borderRadius: "8px",
-                padding: "10px 14px",
-                color: "#b91c1c",
-                fontSize: "13px",
-                marginBottom: "16px",
-              }}
-            >
-              {error}
+          {loading && (
+            <div className={styles.tableLoading}>Loading…</div>
+          )}
+
+          {!loading && filtered.length === 0 && (
+            <div className={styles.tableEmpty}>
+              No events{filter !== "all" ? ` of type "${filter}"` : ""} yet.
             </div>
           )}
 
-          {/* Events table */}
-          <div
-            style={{
-              background: "#fff",
-              border: "1px solid #e5e7eb",
-              borderRadius: "10px",
-              overflow: "hidden",
-            }}
-          >
-            {/* Table header */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "140px 90px 160px 1fr 160px",
-                gap: "0",
-                padding: "10px 16px",
-                background: "#f9fafb",
-                borderBottom: "1px solid #e5e7eb",
-                fontSize: "11px",
-                fontWeight: 700,
-                color: "#6b7280",
-                letterSpacing: "0.05em",
-                textTransform: "uppercase",
-              }}
-            >
-              <span>Session</span>
-              <span>Event</span>
-              <span>Time</span>
-              <span>Metadata</span>
-              <span>Actor</span>
-            </div>
-
-            {loading && (
-              <div style={{ padding: "24px 16px", fontSize: "13px", color: "#9ca3af" }}>
-                Loading…
-              </div>
-            )}
-
-            {!loading && filtered.length === 0 && (
-              <div style={{ padding: "24px 16px", fontSize: "13px", color: "#9ca3af" }}>
-                No events{filter !== "all" ? ` of type "${filter}"` : ""} yet.
-              </div>
-            )}
-
-            {filtered.map((ev, i) => {
-              const sess = sessionMap.get(ev.sessionId);
-              const borderColor = EVENT_COLOR[ev.eventType] ?? "#e5e7eb";
-              const metaSummary = Object.keys(ev.metadata).length > 0
+          {filtered.map((ev) => {
+            const sess = sessionMap.get(ev.sessionId);
+            const metaSummary =
+              Object.keys(ev.metadata).length > 0
                 ? Object.entries(ev.metadata)
-                    .map(([k, v]) => `${k}: ${typeof v === "string" ? v.slice(0, 30) : JSON.stringify(v).slice(0, 30)}`)
+                    .map(
+                      ([k, v]) =>
+                        `${k}: ${typeof v === "string" ? v.slice(0, 30) : JSON.stringify(v).slice(0, 30)}`,
+                    )
                     .join(" · ")
                 : "—";
 
-              return (
-                <div
-                  key={ev.id}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "140px 90px 160px 1fr 160px",
-                    gap: "0",
-                    padding: "10px 16px",
-                    borderBottom: i < filtered.length - 1 ? "1px solid #f3f4f6" : "none",
-                    borderLeft: `3px solid ${borderColor}`,
-                    background: i % 2 === 0 ? "#fff" : "#fafafa",
-                    alignItems: "center",
-                  }}
-                >
-                  {/* Session ID */}
-                  <div>
-                    <span
-                      style={{
-                        fontFamily: "'DM Mono', monospace",
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#111",
-                      }}
-                    >
-                      #{ev.sessionId.slice(0, 8)}
-                    </span>
-                    {sess && (
-                      <div style={{ fontSize: "10px", color: "#9ca3af", marginTop: "1px" }}>
-                        {sess.status}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Event type */}
-                  <span
-                    style={{
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      letterSpacing: "0.05em",
-                      textTransform: "uppercase",
-                      color: borderColor,
-                      fontFamily: "'DM Mono', monospace",
-                    }}
-                  >
-                    {ev.eventType}
+            return (
+              <div
+                key={ev.id}
+                className={styles.eventTableRow}
+                data-event-type={ev.eventType}
+              >
+                {/* Session ID */}
+                <div>
+                  <span className={styles.cellSessionId}>
+                    #{ev.sessionId.slice(0, 8)}
                   </span>
-
-                  {/* Time */}
-                  <span style={{ fontSize: "12px", color: "#6b7280" }}>
-                    {fmt(ev.timestamp)}
-                  </span>
-
-                  {/* Metadata */}
-                  <span
-                    style={{
-                      fontSize: "11px",
-                      color: "#374151",
-                      fontFamily: "'DM Mono', monospace",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                    title={JSON.stringify(ev.metadata, null, 2)}
-                  >
-                    {metaSummary}
-                  </span>
-
-                  {/* Actor */}
-                  <span
-                    style={{
-                      fontSize: "12px",
-                      color: "#9ca3af",
-                      fontFamily: ev.actor ? "'DM Mono', monospace" : undefined,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {ev.actor ?? "—"}
-                  </span>
+                  {sess && (
+                    <div className={styles.cellSessionStatus}>{sess.status}</div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Event type */}
+                <span
+                  className={styles.cellEventType}
+                  data-event-type={ev.eventType}
+                >
+                  {ev.eventType}
+                </span>
+
+                {/* Time */}
+                <span className={styles.cellTime}>{fmt(ev.timestamp)}</span>
+
+                {/* Metadata */}
+                <span
+                  className={styles.cellMeta}
+                  title={JSON.stringify(ev.metadata, null, 2)}
+                >
+                  {metaSummary}
+                </span>
+
+                {/* Actor */}
+                <span
+                  className={styles.cellActor}
+                  data-has-actor={String(!!ev.actor)}
+                >
+                  {ev.actor ?? "—"}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

@@ -66,7 +66,7 @@ export default function UserDashboardPage() {
             <p className="text-sm text-gray-500">You don&apos;t have an active session.</p>
             <Link
               href="/chat"
-              className="inline-block bg-brand-yellow text-gray-900 text-sm font-medium px-5 py-2.5 rounded-xl hover:brightness-95 transition"
+              className="inline-block bg-brand-yellow text-gray-900 text-sm font-medium px-5 py-2.5 rounded-md hover:brightness-95 transition"
             >
               Chat with a Peer Navigator
             </Link>
@@ -96,7 +96,7 @@ export default function UserDashboardPage() {
       <section>
         <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Past Sessions</h2>
         {past.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center">
+          <div className="bg-white border border-gray-200 rounded-md px-5 py-8 text-center">
             <p className="text-sm text-gray-400">No past sessions yet</p>
           </div>
         ) : (

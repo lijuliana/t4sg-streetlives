@@ -1,26 +1,28 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { MapPin, Clock, ShieldCheck, Bed } from "lucide-react";
 import DashboardShell from "@/components/DashboardShell";
 import { MOCK_SERVICES } from "@/lib/mockData";
 
 export default function ServiceDetailPage() {
   const { serviceId } = useParams<{ serviceId: string }>();
+  const searchParams = useSearchParams();
+  const backHref = searchParams.get("back") ?? "/chat";
   const service = MOCK_SERVICES.find((s) => s.id === serviceId);
 
   if (!service) {
     return (
-      <DashboardShell title="Service Not Found" role="user" backHref="/chat">
+      <DashboardShell title="Service Not Found" backHref={backHref}>
         <p className="text-sm text-gray-500">This service could not be found.</p>
       </DashboardShell>
     );
   }
 
   return (
-    <DashboardShell title={service.name} role="user" backHref="/chat">
+    <DashboardShell title={service.name} backHref={backHref}>
       {/* Header card */}
-      <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-3">
+      <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-3">
         <div>
           <h1 className="text-lg font-normal text-gray-900 underline">{service.name}</h1>
           <div className="flex items-center gap-3 mt-1.5 flex-wrap">
@@ -72,7 +74,7 @@ export default function ServiceDetailPage() {
 
       {/* Beds */}
       {service.beds > 0 && (
-        <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 flex items-center gap-2">
+        <div className="bg-white border border-gray-200 rounded-md px-5 py-4 flex items-center gap-2">
           <Bed size={16} className="text-gray-400 flex-shrink-0" />
           <p className="text-sm text-gray-700">
             <span className="font-normal">{service.beds}</span> beds available
@@ -85,7 +87,7 @@ export default function ServiceDetailPage() {
         <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-2">
           About
         </h2>
-        <div className="bg-white border border-gray-200 rounded-xl px-5 py-4">
+        <div className="bg-white border border-gray-200 rounded-md px-5 py-4">
           <p className="text-sm text-gray-700 leading-relaxed">{service.description}</p>
         </div>
       </div>
@@ -95,7 +97,7 @@ export default function ServiceDetailPage() {
         <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-2">
           Eligibility
         </h2>
-        <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-2">
+        <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-2">
           {service.eligibility.map((item) => (
             <div key={item} className="flex items-start gap-2">
               <span className="text-brand-yellow font-medium text-sm leading-none mt-0.5">•</span>
@@ -116,7 +118,7 @@ export default function ServiceDetailPage() {
           <button
             key={label}
             type="button"
-            className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition text-center"
+            className="bg-white border border-gray-200 rounded-md px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition text-center"
           >
             {label}
           </button>

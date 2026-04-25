@@ -5,40 +5,67 @@ import { useRouter } from "next/navigation";
 import { Mic, X } from "lucide-react";
 import moment from "moment";
 import { cn } from "@/lib/utils";
-import { createSession, sendMessage, fetchMessages, getSession } from "@/lib/chatApi";
-import type { Message } from "@/lib/chatApi";
+import { useStore, routeSession } from "@/lib/store";
+import type { ChatMessageRole } from "@/lib/store";
 
-type ChatState = "picker" | "waiting" | "live" | "closed";
-
-type MessageRole = "user" | "navigator" | "system";
-
-interface LocalMessage {
-  id: string;
-  role: MessageRole;
-  content: string;
-  timestamp: string;
-}
-
-const NEED_CATEGORIES = [
-  { value: "housing", label: "Housing" },
-  { value: "employment", label: "Employment" },
-  { value: "health", label: "Health" },
-  { value: "benefits", label: "Benefits" },
-  { value: "youth_services", label: "Youth Services" },
-  { value: "education", label: "Education" },
-  { value: "other", label: "Other" },
-];
+type ChatState = "greeting" | "user_replied" | "connecting" | "live";
 
 const LANGUAGES = [
   { value: "en", label: "English" },
-  { value: "es", label: "Spanish" },
-  { value: "zh", label: "Mandarin" },
-  { value: "fr", label: "French" },
-  { value: "ar", label: "Arabic" },
+  { value: "es", label: "Spanish (Español)" },
+  { value: "zh", label: "Mandarin (中文)" },
+  { value: "fr", label: "French (Français)" },
+  { value: "ar", label: "Arabic (العربية)" },
+  { value: "ht", label: "Haitian Creole (Kreyòl ayisyen)" },
 ];
 
-const POLL_MESSAGES_MS = 3000;
-const POLL_STATUS_MS = 5000;
+const NEED_CATEGORIES = [
+  "Accommodations",
+  "Food",
+  "Clothing",
+  "Personal Care",
+  "Health",
+  "Family Services",
+  "Work",
+  "Legal",
+  "Connection",
+  "Other",
+];
+
+interface LocalMessage {
+  id: string;
+  role: ChatMessageRole;
+  content: string;
+  timestamp: string;
+  serviceId?: string;
+}
+
+// Stable empty array to avoid selector infinite loop
+const EMPTY_MSGS: import("@/lib/store").ChatMessage[] = [];
+
+// Maps raw topic text → ReferralCategory string
+function mapTopicToCategory(text: string): string {
+  const t = text.toLowerCase();
+  if (/sleep|shelter|housing|place to stay|roof/.test(t)) return "Accommodations";
+  if (/food|eat|hungry|meal|pantry/.test(t)) return "Food";
+  if (/job|work|employ|career/.test(t)) return "Work";
+  if (/health|doctor|clinic|medical|care/.test(t)) return "Health";
+  if (/legal|law|court|rights/.test(t)) return "Legal";
+  if (/shower|hygiene|clean|personal/.test(t)) return "Personal Care";
+  if (/family|child|kids/.test(t)) return "Family Services";
+  return "Other";
+}
+
+
+function BotAvatar() {
+  return (
+    <div className="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center flex-shrink-0">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      </svg>
+    </div>
+  );
+}
 
 function NavigatorAvatar() {
   return (
@@ -46,86 +73,81 @@ function NavigatorAvatar() {
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 18v-1a5 5 0 0 1 5-5h8a5 5 0 0 1 5 5v1" />
         <circle cx="12" cy="7" r="4" />
+        <path d="M8 10s1 2 4 2 4-2 4-2" />
       </svg>
     </div>
   );
 }
 
-
-// Parses message body from Matrix format "DisplayName: text" → { sender, text }
-function parseMessage(body: string): { sender: string; text: string } {
-  const colonIdx = body.indexOf(": ");
-  if (colonIdx === -1) return { sender: "Navigator", text: body };
-  return { sender: body.slice(0, colonIdx), text: body.slice(colonIdx + 2) };
-}
-
-export function ChatContent() {
+export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
   const router = useRouter();
 
-  const [chatState, setChatState] = useState<ChatState>("picker");
-  const [needCategory, setNeedCategory] = useState("housing");
-  const [language, setLanguage] = useState("en");
+  const createSession = useStore((s) => s.createSession);
+  const addChatMessage = useStore((s) => s.addChatMessage);
+  const seedChatMessages = useStore((s) => s.seedChatMessages);
 
-  // Session credentials stored in localStorage for tab persistence
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [showIntake, setShowIntake] = useState(true);
+  const [intakeLanguage, setIntakeLanguage] = useState("");
+  const [intakeCategory, setIntakeCategory] = useState("");
 
-  const [messages, setMessages] = useState<LocalMessage[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [routedNavName, setRoutedNavName] = useState("Jenna Rivera");
+
+  // Watch session status so we can detect when navigator closes the session
+  const sessionStatus = useStore((s) =>
+    activeSessionId ? s.sessions.find((sess) => sess.id === activeSessionId)?.status : undefined
+  );
+  const isClosed = sessionStatus === "closed";
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  const [chatState, setChatState] = useState<ChatState>("greeting");
+  const [localMessages, setLocalMessages] = useState<LocalMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
-  const [isStarting, setIsStarting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
+  const [topic, setTopic] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const statusPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const seenEventIds = useRef<Set<string>>(new Set());
-  // Tracks texts sent optimistically this session so the next poll doesn't double-show them
-  const pendingOptimisticTexts = useRef<Set<string>>(new Set());
+  const localMessagesRef = useRef<LocalMessage[]>([]);
+
+  const storeMessages = useStore((s) =>
+    activeSessionId ? (s.chatMessages[activeSessionId] ?? EMPTY_MSGS) : EMPTY_MSGS
+  );
+
+  const displayMessages = activeSessionId ? storeMessages : localMessages;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [displayMessages, isTyping]);
 
-  // Restore session from localStorage on mount
+  const addLocalMessage = useCallback((msg: Omit<LocalMessage, "id" | "timestamp">) => {
+    const newMsg = { ...msg, id: crypto.randomUUID(), timestamp: new Date().toISOString() };
+    setLocalMessages((prev) => [...prev, newMsg]);
+    localMessagesRef.current = [...localMessagesRef.current, newMsg];
+    return newMsg;
+  }, []);
+
+  const hasInitialized = useRef(false);
+
   useEffect(() => {
-    const storedId = localStorage.getItem("sl_session_id");
-    const storedToken = localStorage.getItem("sl_session_token");
-    const storedState = localStorage.getItem("sl_session_state") as ChatState | null;
-    if (storedId && storedToken && storedState && storedState !== "closed") {
-      setSessionId(storedId);
-      setSessionToken(storedToken);
-      setChatState(storedState);
-    }
-  }, []);
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
 
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-    if (statusPollRef.current) { clearInterval(statusPollRef.current); statusPollRef.current = null; }
-  }, []);
-
-  useEffect(() => () => stopPolling(), [stopPolling]);
-
-  const appendMessages = useCallback((raw: Message[]) => {
-    const newMsgs: LocalMessage[] = [];
-    for (const m of raw) {
-      if (seenEventIds.current.has(m.eventId)) continue;
-      seenEventIds.current.add(m.eventId);
-      const { sender, text } = parseMessage(m.body);
-      // Skip User messages that were already shown optimistically this session
-      if (sender === "User" && pendingOptimisticTexts.current.has(text)) {
-        pendingOptimisticTexts.current.delete(text);
-        continue;
+    // Restore the chat session for this browser tab only (sessionStorage).
+    // sessionStorage is cleared when the tab closes, so logged-out users always
+    // get a fresh greeting. Logged-in users keep their chat within the same tab.
+    const storedId = sessionStorage.getItem("chat_session_id");
+    if (storedId) {
+      const state = useStore.getState();
+      const session = state.sessions.find((s) => s.id === storedId && s.status !== "closed");
+      if (session) {
+        setActiveSessionId(storedId);
+        setChatState("live");
+        setShowIntake(false);
+        if (session.navigatorName) setRoutedNavName(session.navigatorName.split(" ")[0]);
+        return;
       }
-      const role: MessageRole = sender === "User" ? "user" : "navigator";
-      newMsgs.push({
-        id: m.eventId,
-        role,
-        content: text,
-        timestamp: new Date(m.timestamp).toISOString(),
-      });
+      sessionStorage.removeItem("chat_session_id");
     }
-    if (newMsgs.length > 0) setMessages((prev) => [...prev, ...newMsgs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const startMessagePolling = useCallback((id: string, token: string) => {
@@ -207,47 +229,39 @@ export function ChatContent() {
 
       if (status === "active") {
         setChatState("live");
-        localStorage.setItem("sl_session_state", "live");
-        setMessages([{ id: crypto.randomUUID(), role: "system", content: "You are connected with a navigator.", timestamp: new Date().toISOString() }]);
-        startMessagePolling(id, token);
+
+        const newSession = createSession("user-1", "Jordan M.", routedNav.id, selectedTopic, true);
+        setActiveSessionId(newSession.id);
+        sessionStorage.setItem("chat_session_id", newSession.id);
+        seedChatMessages(newSession.id, localMessagesRef.current.map((m) => ({ role: m.role, content: m.content, serviceId: m.serviceId })));
+
         setTimeout(() => inputRef.current?.focus(), 100);
-      } else {
-        // unassigned — waiting room
-        setChatState("waiting");
-        localStorage.setItem("sl_session_state", "waiting");
-        startStatusPolling(id, token);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start chat. Please try again.");
-    } finally {
-      setIsStarting(false);
-    }
+      }, 1400);
+    },
+    [addLocalMessage, createSession, seedChatMessages]
+  );
+
+  const handleSend = () => {
+    const text = inputValue.trim();
+    if (!text || chatState !== "live" || !activeSessionId) return;
+    setInputValue("");
+    addChatMessage(activeSessionId, { role: "user", content: text });
   };
 
-  const handleSend = async () => {
-    const text = inputValue.trim();
-    if (!text || chatState !== "live" || !sessionId || !sessionToken) return;
-    setInputValue("");
-
-    // Track so appendMessages can skip the echo when the poll returns it
-    pendingOptimisticTexts.current.add(text);
-
-    // Optimistic UI — show message immediately
-    setMessages((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), role: "user", content: text, timestamp: new Date().toISOString() },
-    ]);
-
-    try {
-      await sendMessage(sessionId, sessionToken, text);
-    } catch {
-      // non-fatal — message shown optimistically, Matrix delivery best-effort
-    }
+  const handleIntakeSubmit = () => {
+    if (!intakeLanguage || !intakeCategory) return;
+    setShowIntake(false);
+    setTimeout(() => addLocalMessage({ role: "bot", content: "Hi, we're here to help guide you through this service" }), 300);
+    setTimeout(() => {
+      addLocalMessage({ role: "bot", content: `Connecting you with someone to help with ${intakeCategory.toLowerCase()}…` });
+      setTimeout(() => triggerNavigatorConnection(intakeCategory), 800);
+    }, 900);
   };
 
   const handleEndChat = () => {
-    stopPolling();
-    router.push("/");
+    sessionStorage.removeItem("chat_session_id");
+    if (onClose) onClose();
+    else router.push("/");
   };
 
   const handleStartNewChat = () => {
@@ -260,8 +274,8 @@ export function ChatContent() {
     window.location.reload();
   };
 
-  const renderMessages = () =>
-    messages.map((msg) => {
+  const renderMessages = () => {
+    return displayMessages.map((msg, i) => {
       if (msg.role === "system") {
         return (
           <div key={msg.id} className="flex items-center gap-3 my-4">
@@ -272,156 +286,195 @@ export function ChatContent() {
         );
       }
 
-      const ts = moment(msg.timestamp).format("h:mm A");
+      const ts = "timestamp" in msg ? moment(msg.timestamp).format("h:mm A") : "";
 
-      if (msg.role === "user") {
+      // Service referral card — left-aligned (from navigator)
+      if ("serviceId" in msg && msg.serviceId) {
+        const hasDetail = msg.serviceId !== "unlinked";
         return (
-          <div key={msg.id} className="flex flex-col items-end mb-3 max-w-[80%] ml-auto">
-            <div className="bg-brand-yellow text-gray-900 text-sm px-4 py-2.5 rounded-2xl rounded-br-sm w-fit">
-              {msg.content}
+          <div key={msg.id} className="flex gap-3 mb-3 max-w-[80%]">
+            <NavigatorAvatar />
+            <div className="flex flex-col">
+              {hasDetail ? (
+                <button
+                  type="button"
+                  onClick={() => router.push(`/services/${msg.serviceId}`)}
+                  className="bg-brand-yellow text-gray-900 text-sm px-4 py-3 rounded-md rounded-tl-sm text-left w-fit hover:brightness-95 transition"
+                >
+                  <p className="font-medium">{msg.content}</p>
+                  <p className="text-xs mt-0.5 underline">Click here for details →</p>
+                </button>
+              ) : (
+                <div className="bg-brand-yellow text-gray-900 text-sm px-4 py-3 rounded-md rounded-tl-sm w-fit">
+                  <p className="font-medium">{msg.content}</p>
+                  <p className="text-xs mt-0.5 text-gray-700">Referral shared by your navigator</p>
+                </div>
+              )}
+              {ts && <span className="text-[10px] text-gray-400 mt-1 ml-1">{ts}</span>}
             </div>
-            <span className="text-[10px] text-gray-400 mt-1 mr-1">{ts}</span>
           </div>
         );
       }
 
-      return (
-        <div key={msg.id} className="flex gap-3 mb-3 max-w-[80%]">
-          <NavigatorAvatar />
-          <div className="flex flex-col">
-            <div className="bg-white text-gray-900 text-sm px-4 py-2.5 rounded-2xl rounded-tl-sm shadow-sm w-fit">
+      if (msg.role === "user") {
+        return (
+          <div key={msg.id} className="flex flex-col items-end mb-3 max-w-[80%] ml-auto">
+            <div className="bg-brand-yellow text-gray-900 text-sm px-4 py-2.5 rounded-md rounded-br-sm w-fit">
               {msg.content}
             </div>
-            <span className="text-[10px] text-gray-400 mt-1 ml-1">{ts}</span>
+            {ts && <span className="text-[10px] text-gray-400 mt-1 mr-1">{ts}</span>}
+          </div>
+        );
+      }
+
+      const prevMsg = displayMessages[i - 1];
+      const showAvatar = !prevMsg || prevMsg.role !== msg.role || (prevMsg.role as string) === "system";
+
+      return (
+        <div key={msg.id} className={cn("flex gap-3 mb-3 max-w-[80%]", !showAvatar && "pl-13")}>
+          {showAvatar ? (
+            msg.role === "navigator" ? <NavigatorAvatar /> : <BotAvatar />
+          ) : (
+            <div className="w-10 flex-shrink-0" />
+          )}
+          <div className="flex flex-col">
+            <div className="bg-white text-gray-900 text-sm px-4 py-2.5 rounded-md rounded-tl-sm shadow-sm w-fit">
+              {msg.content}
+            </div>
+            {ts && <span className="text-[10px] text-gray-400 mt-1 ml-1">{ts}</span>}
           </div>
         </div>
       );
     });
+  };
 
-  // Category + language picker
-  if (chatState === "picker") {
-    return (
-      <div className="flex flex-col h-full bg-gray-100 w-full">
-        <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
-          <div className="w-8" />
-          <span className="font-medium text-base text-gray-900">StreetLives</span>
-          <button type="button" onClick={() => router.push("/")} className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 transition">
-            CLOSE <X size={18} strokeWidth={2.5} />
-          </button>
-        </header>
-
-        <div className="flex-1 flex flex-col justify-center px-6 gap-6">
-          <div>
-            <p className="text-sm font-medium text-gray-700 mb-2">What do you need help with?</p>
-            <div className="flex flex-wrap gap-2">
-              {NEED_CATEGORIES.map((c) => (
-                <button
-                  key={c.value}
-                  type="button"
-                  onClick={() => setNeedCategory(c.value)}
-                  className={cn(
-                    "px-4 py-2 rounded-xl text-sm border transition",
-                    needCategory === c.value
-                      ? "bg-brand-yellow border-brand-yellow text-gray-900 font-medium"
-                      : "border-gray-300 text-gray-700 hover:border-brand-yellow"
-                  )}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-sm font-medium text-gray-700 mb-2">Preferred language</p>
-            <div className="flex flex-wrap gap-2">
-              {LANGUAGES.map((l) => (
-                <button
-                  key={l.value}
-                  type="button"
-                  onClick={() => setLanguage(l.value)}
-                  className={cn(
-                    "px-4 py-2 rounded-xl text-sm border transition",
-                    language === l.value
-                      ? "bg-brand-yellow border-brand-yellow text-gray-900 font-medium"
-                      : "border-gray-300 text-gray-700 hover:border-brand-yellow"
-                  )}
-                >
-                  {l.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {error && <p className="text-sm text-red-500">{error}</p>}
-
-          <button
-            type="button"
-            onClick={handleStartChat}
-            disabled={isStarting}
-            className="bg-brand-yellow text-gray-900 font-medium py-3 rounded-xl hover:brightness-95 transition disabled:opacity-60"
-          >
-            {isStarting ? "Connecting…" : "Start Chat"}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Waiting room
-  if (chatState === "waiting") {
-    return (
-      <div className="flex flex-col h-full bg-gray-100 w-full">
-        <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
-          <div className="w-8" />
-          <span className="font-medium text-base text-gray-900">StreetLives</span>
-          <button type="button" onClick={handleEndChat} className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 transition">
-            LEAVE <X size={18} strokeWidth={2.5} />
-          </button>
-        </header>
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
-          <div className="w-12 h-12 rounded-full border-4 border-brand-yellow border-t-transparent animate-spin" />
-          <p className="text-gray-700 font-medium">Looking for an available navigator…</p>
-          <p className="text-sm text-gray-400">This usually takes less than a minute. Please stay on this page.</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Live chat + closed state
   return (
-    <div className="flex flex-col h-full bg-gray-100 w-full">
+    <div className="relative flex flex-col h-full bg-gray-100 w-full">
+
+      {/* Intake modal */}
+      {showIntake && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-5">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Before we connect you</h2>
+              <p className="text-sm text-gray-500 mt-1">Help us match you with the right navigator.</p>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="intake-language" className="text-sm font-medium text-gray-700">
+                Preferred language
+              </label>
+              <select
+                id="intake-language"
+                value={intakeLanguage}
+                onChange={(e) => setIntakeLanguage(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+              >
+                <option value="" disabled>Select a language</option>
+                {LANGUAGES.map((l) => (
+                  <option key={l.value} value={l.value}>{l.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="intake-category" className="text-sm font-medium text-gray-700">
+                What do you need help with?
+              </label>
+              <select
+                id="intake-category"
+                value={intakeCategory}
+                onChange={(e) => setIntakeCategory(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-brand-yellow"
+              >
+                <option value="" disabled>Select a category</option>
+                {NEED_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleIntakeSubmit}
+              disabled={!intakeLanguage || !intakeCategory}
+              className="w-full bg-brand-yellow text-gray-900 font-medium text-sm py-3 rounded-md hover:brightness-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Start chat
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
         <div className="w-8" />
         <span className="font-medium text-base text-gray-900">StreetLives</span>
-        <button type="button" onClick={handleEndChat} className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 transition">
-          CLOSE <X size={18} strokeWidth={2.5} />
-        </button>
+        {confirmEnd ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">End chat?</span>
+            <button
+              type="button"
+              onClick={handleEndChat}
+              className="text-xs font-medium text-red-500 hover:text-red-700 transition"
+            >
+              Yes
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmEnd(false)}
+              className="text-xs font-medium text-gray-500 hover:text-gray-700 transition"
+            >
+              No
+            </button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setConfirmEnd(true)} className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 transition" aria-label="End chat">
+            End chat
+            <X size={18} strokeWidth={2.5} />
+          </button>
+        )}
       </header>
 
+      {/* Connection status */}
       <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 flex-shrink-0">
         <p className="text-xs text-gray-400 text-center">
-          {chatState === "closed" ? "This session has ended" : "Connected with a peer navigator"}
+          {chatState === "live"
+            ? `Connected with ${routedNavName} · Peer Navigator`
+            : "You are connected with StreetLives assistant"}
         </p>
       </div>
 
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
         {renderMessages()}
+        {isTyping && (
+          <div className="flex gap-3 mb-2">
+            <div className="w-10 h-10 rounded-full bg-gray-300 flex-shrink-0" />
+            <div className="bg-white px-4 py-3 rounded-md rounded-tl-sm shadow-sm flex gap-1 items-center">
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce typing-dot-1" />
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce typing-dot-2" />
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce typing-dot-3" />
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
-      {chatState === "closed" ? (
+      {/* Closed session banner */}
+      {isClosed ? (
         <div className="px-4 py-4 bg-white border-t border-gray-200 flex-shrink-0 text-center space-y-2">
-          <p className="text-xs text-gray-500">Your session has been closed by the navigator.</p>
+          <p className="text-xs text-gray-500">This session has been closed.</p>
           <button
             type="button"
             onClick={handleStartNewChat}
-            className="inline-block bg-brand-yellow text-gray-900 text-sm font-medium px-5 py-2 rounded-xl hover:brightness-95 transition"
+            className="inline-block bg-brand-yellow text-gray-900 text-sm font-medium px-5 py-2 rounded-md hover:brightness-95 transition"
           >
             Start New Chat
           </button>
         </div>
       ) : (
+        /* Input bar */
         <div className="px-4 py-3 bg-white border-t border-gray-200 flex items-center gap-3 flex-shrink-0">
           <input
             ref={inputRef}
@@ -429,14 +482,16 @@ export function ChatContent() {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            placeholder="Type a message…"
-            className="flex-1 text-sm text-gray-500 bg-transparent outline-none placeholder-gray-400"
+            placeholder="Or tell us about what you need…"
+            disabled={chatState !== "live"}
+            className="flex-1 text-sm text-gray-500 bg-transparent outline-none placeholder-gray-400 disabled:cursor-default"
           />
           <button type="button" aria-label="Voice input (coming soon)" className="text-gray-400">
             <Mic size={20} />
           </button>
         </div>
       )}
+
     </div>
   );
 }
