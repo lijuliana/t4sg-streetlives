@@ -150,23 +150,84 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const triggerNavigatorConnection = useCallback(
-    (selectedTopic: string) => {
-      setChatState("connecting");
+  const startMessagePolling = useCallback((id: string, token: string) => {
+    if (pollRef.current) return;
+    // Fetch immediately so history shows on restore, then keep polling
+    fetchMessages(id, token).then(appendMessages).catch(() => {});
+    pollRef.current = setInterval(async () => {
+      try {
+        const msgs = await fetchMessages(id, token);
+        appendMessages(msgs);
+      } catch {
+        // non-fatal, keep polling
+      }
+    }, POLL_MESSAGES_MS);
+  }, [appendMessages]);
 
-      // Determine routed navigator
-      const category = mapTopicToCategory(selectedTopic);
-      const allNavigators = useStore.getState().navigators;
-      const allSessions = useStore.getState().sessions;
-      const routedNavId = routeSession(category, allNavigators, allSessions);
-      const routedNav = allNavigators.find((n) => n.id === routedNavId) ?? allNavigators[0];
-      setRoutedNavName(routedNav.name);
+  const startStatusPolling = useCallback((id: string, token: string) => {
+    if (statusPollRef.current) return;
+    statusPollRef.current = setInterval(async () => {
+      try {
+        const session = await getSession(id, token);
+        if (session.status === "active") {
+          clearInterval(statusPollRef.current!);
+          statusPollRef.current = null;
+          setChatState("live");
+          localStorage.setItem("sl_session_state", "live");
+          setMessages((prev) => [
+            ...prev,
+            { id: crypto.randomUUID(), role: "system", content: "A navigator has joined the chat.", timestamp: new Date().toISOString() },
+          ]);
+          startMessagePolling(id, token);
+          setTimeout(() => inputRef.current?.focus(), 100);
+        } else if (session.status === "closed") {
+          stopPolling();
+          setChatState("closed");
+          localStorage.setItem("sl_session_state", "closed");
+          // Archive to past sessions so the user dashboard can show the transcript
+          const sid = localStorage.getItem("sl_session_id");
+          const stok = localStorage.getItem("sl_session_token");
+          if (sid && stok) {
+            const past = JSON.parse(localStorage.getItem("sl_past_sessions") ?? "[]");
+            if (!past.find((p: { id: string }) => p.id === sid)) {
+              past.unshift({
+                id: sid,
+                token: stok,
+                need_category: localStorage.getItem("sl_session_need_category") ?? "other",
+                created_at: localStorage.getItem("sl_session_created_at") ?? new Date().toISOString(),
+              });
+              localStorage.setItem("sl_past_sessions", JSON.stringify(past));
+            }
+          }
+        }
+      } catch {
+        // non-fatal
+      }
+    }, POLL_STATUS_MS);
+  }, [startMessagePolling, stopPolling]);
 
-      setTimeout(() => setIsTyping(true), 400);
+  // Resume polling when session credentials are restored from localStorage
+  useEffect(() => {
+    if (!sessionId || !sessionToken) return;
+    if (chatState === "live") startMessagePolling(sessionId, sessionToken);
+    if (chatState === "waiting") startStatusPolling(sessionId, sessionToken);
+  }, [chatState, sessionId, sessionToken, startMessagePolling, startStatusPolling]);
 
-      setTimeout(() => {
-        setIsTyping(false);
-        addLocalMessage({ role: "navigator", content: `Hi, I'm ${routedNav.name}. Can you tell me a little more about what you need?` });
+  const handleStartChat = async () => {
+    setIsStarting(true);
+    setError(null);
+    try {
+      const session = await createSession(needCategory, language);
+      const { sessionId: id, sessionUserToken: token, status } = session;
+
+      setSessionId(id);
+      setSessionToken(token);
+      localStorage.setItem("sl_session_id", id);
+      localStorage.setItem("sl_session_token", token);
+      localStorage.setItem("sl_session_need_category", needCategory);
+      localStorage.setItem("sl_session_created_at", new Date().toISOString());
+
+      if (status === "active") {
         setChatState("live");
 
         const newSession = createSession("user-1", "Jordan M.", routedNav.id, selectedTopic, true);
@@ -204,7 +265,12 @@ export function ChatContent({ onClose }: { onClose?: () => void } = {}) {
   };
 
   const handleStartNewChat = () => {
-    sessionStorage.removeItem("chat_session_id");
+    stopPolling();
+    localStorage.removeItem("sl_session_id");
+    localStorage.removeItem("sl_session_token");
+    localStorage.removeItem("sl_session_state");
+    localStorage.removeItem("sl_session_need_category");
+    localStorage.removeItem("sl_session_created_at");
     window.location.reload();
   };
 

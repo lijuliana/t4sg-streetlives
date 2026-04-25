@@ -13,9 +13,11 @@
  *     GET    /sessions/:id/messages             — poll messages (token required)
  *
  *   Navigator/Supervisor (Auth0 JWT required):
- *     GET    /sessions                          — list all sessions
+ *     GET    /sessions                          — list sessions (supervisor=all, navigator=own)
+ *     PATCH  /sessions/:id                      — update notes/outcome/follow_up_date/submitted_for_review
  *     POST   /sessions/:id/close               — close session
  *     POST   /sessions/:id/transfer            — transfer session
+ *     POST   /sessions/:id/approve             — supervisor only; saves coaching_notes, sets approved=true
  *     GET    /sessions/:id/events              — audit log
  *     POST   /sessions/:id/navigator-messages  — navigator sends message
  *
@@ -276,12 +278,92 @@ async function createSession(event) {
   });
 }
 
-// GET /sessions — navigator/supervisor only
-async function listSessions() {
-  const result = await pool.query(
-    "SELECT * FROM sessions ORDER BY created_at DESC"
+// GET /sessions — supervisor sees all; navigator sees only their own sessions
+async function listSessions(jwtPayload) {
+  const roles = jwtPayload["https://streetlives.app/roles"] ?? [];
+
+  if (roles.includes("supervisor")) {
+    const result = await pool.query("SELECT * FROM sessions ORDER BY created_at DESC");
+    return respond(200, result.rows);
+  }
+
+  if (roles.includes("navigator")) {
+    const navResult = await pool.query(
+      "SELECT id FROM navigator_profiles WHERE auth0_user_id = $1",
+      [jwtPayload.sub]
+    );
+    if (navResult.rows.length === 0) {
+      return respond(403, { error: "No navigator profile found for your account" });
+    }
+    const result = await pool.query(
+      "SELECT * FROM sessions WHERE navigator_id = $1 ORDER BY created_at DESC",
+      [navResult.rows[0].id]
+    );
+    return respond(200, result.rows);
+  }
+
+  return respond(403, { error: "Insufficient permissions" });
+}
+
+// PATCH /sessions/:id — navigator (own session only) or supervisor
+async function patchSession(sessionId, body, jwtPayload) {
+  const roles = jwtPayload["https://streetlives.app/roles"] ?? [];
+  const isSupervisor = roles.includes("supervisor");
+  const isNavigator = roles.includes("navigator");
+
+  if (!isSupervisor && !isNavigator) {
+    return respond(403, { error: "Insufficient permissions" });
+  }
+
+  const result = await pool.query("SELECT * FROM sessions WHERE id = $1", [sessionId]);
+  if (result.rows.length === 0) return respond(404, { error: "Session not found" });
+  const session = result.rows[0];
+
+  if (isNavigator && !isSupervisor) {
+    const navResult = await pool.query(
+      "SELECT id FROM navigator_profiles WHERE auth0_user_id = $1",
+      [jwtPayload.sub]
+    );
+    if (navResult.rows.length === 0 || navResult.rows[0].id !== session.navigator_id) {
+      return respond(403, { error: "Only the assigned navigator may update this session" });
+    }
+  }
+
+  const allowed = ["notes", "outcome", "follow_up_date", "submitted_for_review"];
+  const updates = [];
+  const values = [];
+  let i = 1;
+  for (const field of allowed) {
+    if (body[field] !== undefined) {
+      updates.push(`${field} = $${i++}`);
+      values.push(body[field]);
+    }
+  }
+  if (updates.length === 0) return respond(400, { error: "No valid fields to update" });
+
+  values.push(sessionId);
+  const updated = await pool.query(
+    `UPDATE sessions SET ${updates.join(", ")} WHERE id = $${i} RETURNING *`,
+    values
   );
-  return respond(200, result.rows);
+  return respond(200, updated.rows[0]);
+}
+
+// POST /sessions/:id/approve — supervisor only
+async function approveSession(sessionId, body, jwtPayload) {
+  const roles = jwtPayload["https://streetlives.app/roles"] ?? [];
+  if (!roles.includes("supervisor")) {
+    return respond(403, { error: "Supervisor access required" });
+  }
+
+  const result = await pool.query("SELECT id FROM sessions WHERE id = $1", [sessionId]);
+  if (result.rows.length === 0) return respond(404, { error: "Session not found" });
+
+  const updated = await pool.query(
+    "UPDATE sessions SET approved = true, coaching_notes = $1 WHERE id = $2 RETURNING *",
+    [body.coaching_notes ?? null, sessionId]
+  );
+  return respond(200, updated.rows[0]);
 }
 
 // GET /sessions/:id
@@ -578,7 +660,12 @@ export const handler = async (event) => {
 
     // GET /sessions  (list all)
     if (method === "GET" && segments[0] === "sessions" && segments.length === 1) {
-      return await listSessions();
+      return await listSessions(jwtPayload);
+    }
+
+    // PATCH /sessions/:id
+    if (method === "PATCH" && segments[0] === "sessions" && segments.length === 2) {
+      return await patchSession(segments[1], body, jwtPayload);
     }
 
     // POST /sessions/:id/close
@@ -589,6 +676,11 @@ export const handler = async (event) => {
     // POST /sessions/:id/transfer
     if (method === "POST" && segments[0] === "sessions" && segments[2] === "transfer") {
       return await transferSession(segments[1], body, actorSub);
+    }
+
+    // POST /sessions/:id/approve
+    if (method === "POST" && segments[0] === "sessions" && segments[2] === "approve") {
+      return await approveSession(segments[1], body, jwtPayload);
     }
 
     // GET /sessions/:id/events

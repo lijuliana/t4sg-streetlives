@@ -15,6 +15,7 @@ interface RealSession {
   created_at: string;
   closed_at: string | null;
   routing_reason: object | null;
+  submitted_for_review: boolean | null;
 }
 
 interface NavProfile {
@@ -35,7 +36,7 @@ function SessionRow({ session }: { session: RealSession }) {
   const status = mapStatus(session.status);
   return (
     <Link
-      href={`/dashboard/navigator/${session.id}/chat`}
+      href={`/dashboard/navigator/${session.id}`}
       className="block bg-white border border-gray-200 rounded-xl px-4 py-3.5 hover:border-gray-300 hover:shadow-md transition"
     >
       <div className="flex items-center gap-3">
@@ -114,27 +115,16 @@ export default function NavigatorDashboardPage() {
   const newCount = newRequests.length;
   const closedCount = past.length;
 
-  const sortedActiveAndNew = sortByUrgency([...active, ...newRequests], chatMessages);
-  const sortedPast = sortByUrgency(past, chatMessages);
+  // Navigator only receives their own sessions from the Lambda (role-filtered),
+  // but unassigned sessions have navigator_id=null so they come through too.
+  const mySessions = myProfile
+    ? allSessions.filter((s) => s.navigator_id === myProfile.id)
+    : [];
 
-  const summaryStrip = (
-    <div className="flex gap-4 bg-white border border-gray-200 rounded-md px-5 py-4">
-      <div className="flex-1 text-center">
-        <p className="text-2xl font-normal text-gray-900">{activeCount}</p>
-        <p className="text-xs text-green-600 font-medium mt-0.5">Active</p>
-      </div>
-      <div className="w-px bg-gray-200" />
-      <div className="flex-1 text-center">
-        <p className={`text-2xl font-normal mt-0.5 ${newCount > 0 ? "text-amber-600" : "text-gray-900"}`}>{newCount}</p>
-        <p className="text-xs text-amber-600 font-medium mt-0.5">New Requests</p>
-      </div>
-      <div className="w-px bg-gray-200" />
-      <div className="flex-1 text-center">
-        <p className="text-2xl font-normal text-gray-900">{closedCount}</p>
-        <p className="text-xs text-gray-400 font-medium mt-0.5">Closed</p>
-      </div>
-    </div>
-  );
+  const unassigned = allSessions.filter((s) => s.navigator_id === null).sort(byRecent);
+  const active = mySessions.filter((s) => s.status !== "closed").sort(byRecent);
+  // Closed = submitted for review (closed and sent to supervisor)
+  const closed = mySessions.filter((s) => s.status === "closed").sort(byRecent);
 
   return (
     <DashboardShell title="My Sessions" role="navigator" fullWidth>
@@ -198,58 +188,64 @@ export default function NavigatorDashboardPage() {
         </section>
       </div>
 
-      {/* ── Desktop layout (lg+) ── */}
-      <div className="hidden lg:block overflow-y-auto px-6 py-5 space-y-5">
-        {summaryStrip}
-
-        <div className="grid grid-cols-2 gap-5">
-          {/* Left column: Active + New Requests */}
-          <section>
-            <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">
-              Active &amp; New Requests
-            </h2>
-            {sortedActiveAndNew.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-md px-5 py-8 text-center">
-                <p className="text-sm text-gray-400">No active sessions or new requests</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {sortedActiveAndNew.map((session) => (
-                  <SessionCard
-                    key={session.id}
-                    session={session}
-                    viewerRole="navigator"
-                    urgent24h={hasUnresponded24h(session.id, chatMessages)}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* Right column: Past Sessions */}
-          <section>
-            <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">
-              Past Sessions
-            </h2>
-            {sortedPast.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-md px-5 py-8 text-center">
-                <p className="text-sm text-gray-400">No closed sessions yet</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {sortedPast.map((session) => (
-                  <SessionCard
-                    key={session.id}
-                    session={session}
-                    viewerRole="navigator"
-                    urgent24h={hasUnresponded24h(session.id, chatMessages)}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
+      {/* Summary strip */}
+      <div className="flex gap-4 bg-white border border-gray-200 rounded-xl px-5 py-4">
+        <div className="flex-1 text-center">
+          <p className="text-2xl font-normal text-gray-900">{active.length}</p>
+          <p className="text-xs text-green-600 font-medium mt-0.5">Active</p>
+        </div>
+        <div className="w-px bg-gray-200" />
+        <div className="flex-1 text-center">
+          <p className={`text-2xl font-normal mt-0.5 ${unassigned.length > 0 ? "text-amber-600" : "text-gray-900"}`}>
+            {unassigned.length}
+          </p>
+          <p className="text-xs text-amber-600 font-medium mt-0.5">Unassigned</p>
+        </div>
+        <div className="w-px bg-gray-200" />
+        <div className="flex-1 text-center">
+          <p className="text-2xl font-normal text-gray-900">{closed.length}</p>
+          <p className="text-xs text-gray-400 font-medium mt-0.5">Closed</p>
         </div>
       </div>
+
+      <section>
+        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Active</h2>
+        {active.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center">
+            <p className="text-sm text-gray-400">No active sessions</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {active.map((s) => <SessionRow key={s.id} session={s} />)}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Unassigned</h2>
+        {unassigned.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center">
+            <p className="text-sm text-gray-400">No unassigned sessions</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {unassigned.map((s) => <SessionRow key={s.id} session={s} />)}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Closed</h2>
+        {closed.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center">
+            <p className="text-sm text-gray-400">No closed sessions yet</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {closed.map((s) => <SessionRow key={s.id} session={s} />)}
+          </div>
+        )}
+      </section>
     </DashboardShell>
   );
 }

@@ -1,33 +1,74 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Circle, UserPlus, ArrowRight, CheckCircle, RotateCcw } from "lucide-react";
+import { ArrowLeft, Send, Circle, UserPlus, ArrowRight, CheckCircle } from "lucide-react";
 import moment from "moment";
-import { useStore } from "@/lib/store";
-import type { SessionEvent, SessionLog } from "@/lib/store";
-import DashboardShell from "@/components/DashboardShell";
-import SessionStatusBadge from "@/components/SessionStatusBadge";
-import ReferralCard from "@/components/ReferralCard";
-import ReferralForm from "@/components/ReferralForm";
-import NavigatorChatPanel from "@/components/NavigatorChatPanel";
+import { cn } from "@/lib/utils";
 
-const CHAT_MIN_WIDTH = 300;
-const CHAT_MAX_WIDTH = 640;
-const CHAT_DEFAULT_WIDTH = 420;
+const OUTCOME_OPTIONS = [
+  "Referrals shared",
+  "Information Only",
+  "Follow-Up Needed",
+];
 
-const DEMO_NAVIGATOR_ID = "nav-1";
+const POLL_MS = 3000;
 
-const EVENT_LABELS: Record<SessionEvent["type"], string> = {
+interface Session {
+  id: string;
+  navigator_id: string | null;
+  need_category: string;
+  language: string | null;
+  status: string;
+  created_at: string;
+  closed_at: string | null;
+  notes: string | null;
+  outcome: string[] | null;
+  follow_up_date: string | null;
+  submitted_for_review: boolean | null;
+}
+
+interface NavProfile {
+  id: string;
+  auth0_user_id: string;
+  nav_group: string;
+  status: string;
+  capacity: number;
+  languages: string[];
+}
+
+interface SessionEvent {
+  id: string;
+  session_id: string;
+  event_type: "created" | "assigned" | "transferred" | "closed";
+  actor_id: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+interface MatrixMessage {
+  eventId: string;
+  body: string;
+  timestamp: number;
+}
+
+interface LocalMessage {
+  id: string;
+  role: "user" | "navigator";
+  content: string;
+  timestamp: string;
+}
+
+const EVENT_LABELS: Record<SessionEvent["event_type"], string> = {
   created: "Session created",
-  assigned: "Assigned",
+  assigned: "Assigned to navigator",
   transferred: "Transferred",
   closed: "Session closed",
   returned: "Returned to navigator",
 };
 
-function EventIcon({ type }: { type: SessionEvent["type"] }) {
+function EventIcon({ type }: { type: SessionEvent["event_type"] }) {
   const cls = "flex-shrink-0 mt-0.5";
   if (type === "created") return <Circle size={14} className={`${cls} text-gray-400`} />;
   if (type === "assigned") return <UserPlus size={14} className={`${cls} text-blue-400`} />;
@@ -36,34 +77,19 @@ function EventIcon({ type }: { type: SessionEvent["type"] }) {
   return <CheckCircle size={14} className={`${cls} text-green-500`} />;
 }
 
-function TimelineEvent({ event }: { event: SessionEvent }) {
-  const [open, setOpen] = useState(false);
+function parseMessage(body: string): { sender: string; text: string } {
+  const colonIdx = body.indexOf(": ");
+  if (colonIdx === -1) return { sender: "Navigator", text: body };
+  return { sender: body.slice(0, colonIdx), text: body.slice(colonIdx + 2) };
+}
+
+function UserAvatar() {
   return (
-    <div className="flex items-start gap-2.5">
-      <EventIcon type={event.type} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <p className="text-sm text-gray-700">{EVENT_LABELS[event.type]}</p>
-          {event.note && (
-            <button
-              type="button"
-              onClick={() => setOpen((v) => !v)}
-              className="text-[10px] text-gray-400 hover:text-gray-600 transition"
-            >
-              {open ? "▲" : "▼"}
-            </button>
-          )}
-        </div>
-        <p className="text-xs text-gray-400 mt-0.5" suppressHydrationWarning>
-          {moment(event.timestamp).format("MMM D [at] h:mm A")} · {event.actorName}
-        </p>
-        {open && event.note && (
-          <div className="mt-1 bg-gray-50 rounded px-2 py-1">
-            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-0.5">Notes</p>
-            <p className="text-xs text-gray-500">{event.note}</p>
-          </div>
-        )}
-      </div>
+    <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+        <circle cx="12" cy="7" r="4" />
+      </svg>
     </div>
   );
 }
@@ -71,25 +97,199 @@ function TimelineEvent({ event }: { event: SessionEvent }) {
 export default function NavigatorSessionDetailPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
 
-  const getSessionById = useStore((s) => s.getSessionById);
-  const navigators = useStore((s) => s.navigators);
-  const updateSessionStatus = useStore((s) => s.updateSessionStatus);
-  const endSession = useStore((s) => s.endSession);
-  const assignSession = useStore((s) => s.assignSession);
-  const transferSession = useStore((s) => s.transferSession);
-  const rerouteSession = useStore((s) => s.rerouteSession);
-  const activeRole = useStore((s) => s.activeRole);
-  const chatMessageCount = useStore((s) => s.chatMessages[sessionId]?.length ?? 0);
-  const logSession = useStore((s) => s.logSession);
-  const submitForReview = useStore((s) => s.submitForReview);
-  const approveSession = useStore((s) => s.approveSession);
-  const returnSession = useStore((s) => s.returnSession);
+  const [session, setSession] = useState<Session | null>(null);
+  const [navigators, setNavigators] = useState<NavProfile[]>([]);
+  const [events, setEvents] = useState<SessionEvent[]>([]);
+  const [myProfile, setMyProfile] = useState<NavProfile | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const session = getSessionById(sessionId);
+  // Notes
+  const [notes, setNotes] = useState("");
+  const [savingNotes, setSavingNotes] = useState(false);
 
-  const [referralOpen, setReferralOpen] = useState(false);
-  const [summaryText, setSummaryText] = useState(session?.summary ?? "");
-  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  // Transfer
+  const [transferTarget, setTransferTarget] = useState("");
+
+  // Close flow
+  const [showClosePanel, setShowClosePanel] = useState(false);
+  const [selectedOutcomes, setSelectedOutcomes] = useState<string[]>([]);
+  const [followUpDate, setFollowUpDate] = useState("");
+  const [closing, setClosing] = useState(false);
+
+  // Chat
+  const [messages, setMessages] = useState<LocalMessage[]>([]);
+  const [inputValue, setInputValue] = useState("");
+  const [sendError, setSendError] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const seenEventIds = useRef<Set<string>>(new Set());
+
+  // Resizable split panel
+  const [leftWidth, setLeftWidth] = useState(420);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!isDragging.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      setLeftWidth(Math.max(260, Math.min(rect.width - 300, e.clientX - rect.left)));
+    };
+    const onUp = () => { isDragging.current = false; document.body.style.cursor = ""; };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return () => { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
+  }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Load session, navigators, events, and current user's profile on mount
+  useEffect(() => {
+    async function load() {
+      const [sessionRes, navsRes, eventsRes] = await Promise.all([
+        fetch(`/api/sessions/${sessionId}`),
+        fetch(`/api/navigators`),
+        fetch(`/api/sessions/${sessionId}/events`),
+      ]);
+      const [s, navs, evts] = await Promise.all([
+        sessionRes.json(),
+        navsRes.json(),
+        eventsRes.json(),
+      ]);
+      setSession(s);
+      setNavigators(Array.isArray(navs) ? navs : []);
+      setEvents(Array.isArray(evts) ? evts : []);
+      setNotes(s.notes ?? "");
+
+      // Identify the current user's navigator profile via the session endpoint
+      // (the navigator dashboard already guards this route via middleware)
+      if (s.navigator_id) {
+        const mine = (Array.isArray(navs) ? navs : []).find(
+          (n: NavProfile) => n.id === s.navigator_id
+        );
+        if (mine) setMyProfile(mine);
+      }
+      setLoading(false);
+    }
+    load().catch(console.error);
+  }, [sessionId]);
+
+  // Poll chat messages
+  const appendMessages = useCallback((raw: MatrixMessage[]) => {
+    const newMsgs: LocalMessage[] = [];
+    for (const m of raw) {
+      if (seenEventIds.current.has(m.eventId)) continue;
+      seenEventIds.current.add(m.eventId);
+      const { sender, text } = parseMessage(m.body);
+      newMsgs.push({
+        id: m.eventId,
+        role: sender === "User" ? "user" : "navigator",
+        content: text,
+        timestamp: new Date(m.timestamp).toISOString(),
+      });
+    }
+    if (newMsgs.length > 0) setMessages((prev) => [...prev, ...newMsgs]);
+  }, []);
+
+  useEffect(() => {
+    const poll = () => {
+      fetch(`/api/sessions/${sessionId}/messages`)
+        .then((r) => r.json())
+        .then((d) => appendMessages(d.messages ?? []))
+        .catch(console.error);
+    };
+    poll();
+    pollRef.current = setInterval(poll, POLL_MS);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [sessionId, appendMessages]);
+
+  const saveNotes = async () => {
+    if (!session || notes === (session.notes ?? "")) return;
+    setSavingNotes(true);
+    try {
+      await fetch(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes }),
+      });
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
+  const handleTransfer = async (targetId: string) => {
+    const res = await fetch(`/api/sessions/${sessionId}/transfer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target_navigator_id: targetId }),
+    });
+    if (res.ok) {
+      toast.success("Session transferred");
+      router.push("/dashboard/navigator");
+    } else {
+      const err = await res.json().catch(() => ({}));
+      toast.error(err.error ?? "Transfer failed");
+    }
+  };
+
+  const handleClose = async () => {
+    setClosing(true);
+    try {
+      // Close the session
+      const closeRes = await fetch(`/api/sessions/${sessionId}/close`, { method: "POST" });
+      if (!closeRes.ok) {
+        toast.error("Failed to close session");
+        return;
+      }
+      // Save outcome, follow-up date, and submit for review in one PATCH
+      // Notes are already saved separately via the notes field above
+      await fetch(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outcome: selectedOutcomes,
+          follow_up_date: followUpDate || null,
+          submitted_for_review: true,
+        }),
+      });
+      toast.success("Session closed and submitted for review");
+      router.push("/dashboard/navigator");
+    } finally {
+      setClosing(false);
+    }
+  };
+
+  const handleSend = async () => {
+    const text = inputValue.trim();
+    if (!text || session?.status === "closed") return;
+    setInputValue("");
+    setSendError(null);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/navigator-messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setSendError(err.error ?? "Failed to send");
+      }
+    } catch {
+      setSendError("Network error");
+    }
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <p className="text-sm text-gray-400">Loading…</p>
+      </div>
+    );
+  }
 
   // Wrap-up form state
   const [wrapOutcome, setWrapOutcome] = useState<SessionLog["outcome"]>([]);
@@ -140,480 +340,278 @@ export default function NavigatorSessionDetailPage() {
 
   if (!session) {
     return (
-      <DashboardShell
-        title="Session Not Found"
-        role={activeRole === "supervisor" ? "supervisor" : "navigator"}
-        backHref={activeRole === "supervisor" ? "/dashboard/supervisor" : "/dashboard/navigator"}
-      >
-        <p className="text-sm text-gray-500">This session could not be found.</p>
-      </DashboardShell>
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <p className="text-sm text-gray-500">Session not found.</p>
+      </div>
     );
   }
 
   const isClosed = session.status === "closed";
-  const isSupervisor = activeRole === "supervisor";
-  const isUnassigned = session.navigatorId === null;
-  const isMySession = session.navigatorId === DEMO_NAVIGATOR_ID;
-
-  const wrapOutcomeValid = wrapOutcome.length > 0;
-
-  const handleClose = () => {
-    endSession(session.id, wrapNotes || undefined);
-    logSession(session.id, {
-      outcome: wrapOutcome,
-      referralsShared: session.referrals.map((r) => r.serviceName),
-      notes: wrapNotes,
-      followUp: wrapFollowUp || wrapOutcome.includes("follow_up_needed"),
-      followUpDate: wrapFollowUpDate || undefined,
-    });
-    submitForReview(session.id);
-    toast.success("Session closed and submitted for review");
-    setShowCloseConfirm(false);
-  };
-
-  const otherNavigators = navigators.filter((n) => n.id !== session.navigatorId);
+  const isMySession = myProfile !== null;
+  const otherNavigators = navigators.filter((n) => n.id !== session.navigator_id && n.status === "available");
+  const categoryLabel = session.need_category.replace(/_/g, " ");
 
   return (
-    <DashboardShell
-      title={`#${session.id.slice(-5).toUpperCase()}`}
-      role={isSupervisor ? "supervisor" : "navigator"}
-      backHref={isSupervisor ? "/dashboard/supervisor" : "/dashboard/navigator"}
-      fullWidth
-    >
-      <div className="flex h-full overflow-hidden">
-        {/* Detail content */}
-        <div className="flex-1 min-w-0 overflow-y-auto px-6 py-5 space-y-5 pb-10">
-
-      {/* Session header */}
-      <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 flex-wrap">
-            {session.topics.map((t) => (
-              <span key={t} className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full capitalize">
-                {t}
-              </span>
-            ))}
-            {session.assignedByRouting && (
-              <span className="text-[10px] bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded-full">
-                Routed
-              </span>
-            )}
-          </div>
-          <SessionStatusBadge status={session.status} />
-        </div>
-        <div className="text-xs text-gray-400 space-y-0.5">
-          <p suppressHydrationWarning className={session.navigatorId ? undefined : "text-amber-500"}>
-            {session.navigatorId ? `Navigator: ${session.navigatorName}` : "Unassigned"}
-          </p>
-          <p suppressHydrationWarning>Started {moment(session.startedAt).format("MMM D, YYYY [at] h:mm A")}</p>
-          {session.closedAt && (
-            <p suppressHydrationWarning>Closed {moment(session.closedAt).format("MMM D, YYYY [at] h:mm A")}</p>
-          )}
-        </div>
-      </div>
-
-      {/* Assign to me — unassigned + navigator role */}
-      {isUnassigned && !isSupervisor && (
+    <div className="flex flex-col h-screen bg-gray-50">
+      {/* Header */}
+      <header className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
         <button
           type="button"
-          onClick={() => {
-            assignSession(session.id, DEMO_NAVIGATOR_ID);
-            toast.success("Session accepted");
-          }}
-          className="w-full bg-brand-yellow text-gray-900 text-sm font-medium py-2.5 rounded-md hover:brightness-95 transition"
+          onClick={() => router.push("/dashboard/navigator")}
+          className="p-1 -ml-1 text-gray-500 hover:text-gray-800 transition"
+          aria-label="Back"
         >
-          Accept Session
+          <ArrowLeft size={20} strokeWidth={2} />
         </button>
-      )}
-
-      {/* Assign to… — unassigned + supervisor role */}
-      {isUnassigned && isSupervisor && (
-        <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-2">
-          <p className="text-xs font-normal text-gray-500 uppercase tracking-wide">Assign to Navigator</p>
-          <select
-            aria-label="Assign to navigator"
-            defaultValue=""
-            onChange={(e) => {
-              if (e.target.value) {
-                assignSession(session.id, e.target.value);
-                toast.success("Session assigned");
-              }
-            }}
-            className="w-full text-sm border border-gray-200 rounded-md px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
-          >
-            <option value="" disabled>Select a navigator…</option>
-            {navigators.map((n) => (
-              <option key={n.id} value={n.id}>{n.name}</option>
-            ))}
-          </select>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900 capitalize">{categoryLabel}</p>
+          <p className="text-xs text-gray-400">
+            {isClosed ? "Closed" : session.status} · Started {moment(session.created_at).format("MMM D, YYYY")}
+          </p>
         </div>
-      )}
+        <span className={cn(
+          "text-xs font-medium px-2.5 py-1 rounded-full",
+          isClosed ? "bg-gray-100 text-gray-500" :
+          session.status === "active" ? "bg-green-100 text-green-700" :
+          "bg-amber-100 text-amber-700"
+        )}>
+          {isClosed ? "Closed" : session.status}
+        </span>
+      </header>
 
-      {/* Transfer + Re-run routing — supervisor only */}
-      {!isClosed && !isUnassigned && isSupervisor && (
-        <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-3">
-          <p className="text-xs font-normal text-gray-500 uppercase tracking-wide">Routing</p>
-          <div className="flex gap-2">
-            <select
-              aria-label="Transfer to navigator"
-              defaultValue=""
-              onChange={(e) => {
-                if (e.target.value) transferSession(session.id, e.target.value);
-              }}
-              className="flex-1 text-sm border border-gray-200 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
-            >
-              <option value="" disabled>Transfer to…</option>
-              {otherNavigators.map((n) => (
-                <option key={n.id} value={n.id}>{n.name}</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => rerouteSession(session.id)}
-              className="text-xs font-medium text-gray-700 border border-gray-200 px-3 py-2 rounded-md hover:bg-gray-50 transition whitespace-nowrap"
-            >
-              Re-run Routing
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Split layout */}
+      <div ref={containerRef} className="flex flex-1 overflow-hidden">
+        {/* Left panel — session details */}
+        <div style={{ width: leftWidth }} className="flex-shrink-0 overflow-y-auto bg-white p-5 space-y-5">
 
-      {/* Close session — navigator only, active session */}
-      {!isClosed && !isSupervisor && isMySession && (
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setShowCloseConfirm(true)}
-            className="flex-1 bg-gray-900 text-white text-sm font-medium py-2.5 rounded-md hover:bg-gray-800 transition"
-          >
-            Close Session
-          </button>
-        </div>
-      )}
-
-      {/* Wrap-up form */}
-      {showCloseConfirm && (
-        <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-4">
-          <p className="text-sm font-medium text-gray-900">Close this session?</p>
-
-          {/* Outcome checkboxes */}
-          <div>
-            <p className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-2">
-              Outcome <span className="text-red-400 normal-case font-normal">* required</span>
-            </p>
-            <div className="space-y-2">
-              {(
-                [
-                  { value: "referrals_shared", label: "Referrals shared" },
-                  { value: "information_only", label: "Information only" },
-                  { value: "follow_up_needed", label: "Follow-up needed" },
-                ] as { value: SessionLog["outcome"][number]; label: string }[]
-              ).map(({ value, label }) => (
-                <label key={value} className="flex items-center gap-2.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={wrapOutcome.includes(value)}
-                    onChange={(e) =>
-                      setWrapOutcome((prev) =>
-                        e.target.checked ? [...prev, value] : prev.filter((v) => v !== value)
-                      )
-                    }
-                    className="w-4 h-4 rounded accent-gray-900"
-                  />
-                  <span className="text-sm text-gray-700">{label}</span>
-                </label>
-              ))}
-            </div>
+          {/* Session info */}
+          <div className="space-y-1 text-sm text-gray-600">
+            <p><span className="text-gray-400">Category:</span> <span className="capitalize">{categoryLabel}</span></p>
+            {session.language && <p><span className="text-gray-400">Language:</span> {session.language.toUpperCase()}</p>}
+            <p><span className="text-gray-400">Started:</span> {moment(session.created_at).format("MMM D, YYYY [at] h:mm A")}</p>
+            {session.closed_at && (
+              <p><span className="text-gray-400">Closed:</span> {moment(session.closed_at).format("MMM D, YYYY [at] h:mm A")}</p>
+            )}
+            {session.navigator_id ? (
+              <p><span className="text-gray-400">Navigator:</span> {myProfile?.nav_group ?? session.navigator_id}</p>
+            ) : (
+              <p className="text-amber-500">Unassigned</p>
+            )}
           </div>
 
-          {/* Notes */}
+          {/* Session notes */}
           <div>
-            <p className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-2">Notes</p>
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Session Notes</h2>
             <textarea
-              value={wrapNotes}
-              onChange={(e) => setWrapNotes(e.target.value)}
-              rows={3}
-              placeholder="Session notes (optional)..."
-              className="w-full text-sm border border-gray-200 rounded-md px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow placeholder-gray-400 resize-none"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              onBlur={saveNotes}
+              disabled={isClosed}
+              rows={4}
+              placeholder="Add notes about this session…"
+              className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow placeholder-gray-400 resize-none disabled:bg-gray-50 disabled:text-gray-500"
             />
+            {savingNotes && <p className="text-xs text-gray-400 mt-1">Saving…</p>}
           </div>
 
-          {/* Follow-up toggle + date */}
-          <div className="space-y-2">
-            <label className="flex items-center gap-2.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={wrapFollowUp || wrapOutcome.includes("follow_up_needed")}
-                onChange={(e) => setWrapFollowUp(e.target.checked)}
-                className="w-4 h-4 rounded accent-gray-900"
-              />
-              <span className="text-sm text-gray-700">Schedule follow-up</span>
-            </label>
-            {(wrapFollowUp || wrapOutcome.includes("follow_up_needed")) && (
-              <input
-                type="date"
-                aria-label="Follow-up date"
-                value={wrapFollowUpDate}
-                onChange={(e) => setWrapFollowUpDate(e.target.value)}
-                className="w-full text-sm border border-gray-200 rounded-md px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow"
-              />
-            )}
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setShowCloseConfirm(false)}
-              className="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2.5 rounded-md hover:bg-gray-50 transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleClose}
-              disabled={!wrapOutcomeValid}
-              className="flex-1 bg-brand-yellow text-gray-900 text-sm font-medium py-2.5 rounded-md hover:brightness-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Close & Submit for Review
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Outcome Log — read-only, shown when session is closed and logged */}
-      {isClosed && session.logged && session.sessionLog && (
-        <div>
-          <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-2">
-            Outcome Log
-          </h2>
-          <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-3">
-            <div className="flex flex-wrap gap-2">
-              {session.sessionLog.outcome.map((o) => (
-                <span key={o} className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full capitalize">
-                  {o === "referrals_shared" ? "Referrals shared" : o === "information_only" ? "Information only" : "Follow-up needed"}
-                </span>
-              ))}
+          {/* Timeline */}
+          <div>
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Timeline</h2>
+            <div className="space-y-3">
+              {events.length === 0 ? (
+                <p className="text-sm text-gray-400">No events recorded.</p>
+              ) : (
+                events.map((event) => (
+                  <div key={event.id} className="flex items-start gap-2.5">
+                    <EventIcon type={event.event_type} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-700">{EVENT_LABELS[event.event_type]}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {moment(event.created_at).format("MMM D [at] h:mm A")}
+                        {event.actor_id ? ` · ${event.actor_id}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
-            {session.sessionLog.notes && (
-              <p className="text-sm text-gray-700">{session.sessionLog.notes}</p>
-            )}
-            {session.sessionLog.followUp && (
-              <p className="text-xs text-amber-600 font-medium">
-                Follow-up scheduled{session.sessionLog.followUpDate ? `: ${moment(session.sessionLog.followUpDate).format("MMM D, YYYY")}` : ""}
-              </p>
-            )}
-            {session.sessionLog.referralsShared.length > 0 && (
+          </div>
+
+          {/* Transfer — active assigned sessions */}
+          {!isClosed && isMySession && otherNavigators.length > 0 && (
+            <div>
+              <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Transfer Session</h2>
+              <div className="flex gap-2">
+                <select
+                  aria-label="Transfer to navigator"
+                  value={transferTarget}
+                  onChange={(e) => setTransferTarget(e.target.value)}
+                  className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
+                >
+                  <option value="" disabled>Select navigator…</option>
+                  {otherNavigators.map((n) => (
+                    <option key={n.id} value={n.id}>{n.nav_group} ({n.languages.join(", ")})</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={!transferTarget}
+                  onClick={() => handleTransfer(transferTarget)}
+                  className="text-sm font-medium px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Transfer
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Close session */}
+          {!isClosed && isMySession && !showClosePanel && (
+            <button
+              type="button"
+              onClick={() => setShowClosePanel(true)}
+              className="w-full bg-gray-900 text-white text-sm font-medium py-2.5 rounded-xl hover:bg-gray-800 transition"
+            >
+              Close Session
+            </button>
+          )}
+
+          {/* Close panel */}
+          {showClosePanel && (
+            <div className="border border-gray-200 rounded-xl p-4 space-y-4">
+              <p className="text-sm font-medium text-gray-900">Close this session</p>
+
               <div>
-                <p className="text-xs text-gray-400 mb-1">Referrals at close</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {session.sessionLog.referralsShared.map((name) => (
-                    <span key={name} className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
-                      {name}
-                    </span>
+                <p className="text-xs text-gray-500 mb-2">Outcome (select all that apply)</p>
+                <div className="space-y-1.5">
+                  {OUTCOME_OPTIONS.map((opt) => (
+                    <label key={opt} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedOutcomes.includes(opt)}
+                        onChange={(e) => {
+                          setSelectedOutcomes(e.target.checked
+                            ? [...selectedOutcomes, opt]
+                            : selectedOutcomes.filter((o) => o !== opt)
+                          );
+                        }}
+                        className="rounded border-gray-300"
+                      />
+                      {opt}
+                    </label>
                   ))}
                 </div>
               </div>
-            )}
-          </div>
-        </div>
-      )}
 
-      {/* Session Notes */}
-      {!showCloseConfirm && (
-        <div>
-          <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-2">
-            Session Notes
-          </h2>
-          {isClosed || isSupervisor ? (
-            <div className="bg-white border border-gray-200 rounded-md px-5 py-4">
-              {session.summary ? (
-                <p className="text-sm text-gray-700">{session.summary}</p>
-              ) : (
-                <p className="text-sm text-gray-400 italic">No summary recorded.</p>
-              )}
-            </div>
-          ) : (
-            <textarea
-              value={summaryText}
-              onChange={(e) => setSummaryText(e.target.value)}
-              onBlur={() => {
-                if (summaryText !== session.summary) {
-                  updateSessionStatus(session.id, session.status, summaryText);
-                }
-              }}
-              rows={3}
-              placeholder="Add session notes..."
-              className="w-full text-sm border border-gray-200 rounded-md px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow placeholder-gray-400 resize-none bg-white"
-            />
-          )}
-        </div>
-      )}
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Follow-up date (optional)</p>
+                <input
+                  type="date"
+                  value={followUpDate}
+                  onChange={(e) => setFollowUpDate(e.target.value)}
+                  className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow"
+                />
+              </div>
 
-      {/* Referrals */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide">
-            Referrals ({session.referrals.length})
-          </h2>
-          {!isClosed && !isSupervisor && isMySession && (
-            <button
-              type="button"
-              onClick={() => setReferralOpen(true)}
-              className="flex items-center gap-1 text-xs font-medium text-gray-900 bg-brand-yellow px-3 py-1.5 rounded-md hover:brightness-95 transition"
-            >
-              <Plus size={13} strokeWidth={2.5} />
-              Add Referral
-            </button>
-          )}
-        </div>
-        {session.referrals.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-md px-5 py-6 text-center">
-            <p className="text-sm text-gray-400">No referrals yet</p>
-            {!isClosed && !isSupervisor && isMySession && (
-              <button
-                type="button"
-                onClick={() => setReferralOpen(true)}
-                className="mt-2 text-xs text-gray-500 underline hover:text-gray-700 transition"
-              >
-                Add the first one
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {session.referrals.map((ref) => (
-              <ReferralCard key={ref.id} referral={ref} editable={!isClosed && !isSupervisor} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Timeline */}
-      <div>
-        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">
-          Timeline
-        </h2>
-        <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-3">
-          {session.events.length === 0 ? (
-            <p className="text-sm text-gray-400">No events recorded.</p>
-          ) : (
-            session.events.map((event) => (
-              <TimelineEvent key={event.id} event={event} />
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Review status — navigator view, after closing */}
-      {!isSupervisor && isClosed && session.logged && (
-        <div>
-          {session.reviewStatus === "returned" && (
-            <div className="bg-red-50 border border-red-200 rounded-md px-5 py-3 space-y-1">
-              <p className="text-xs font-medium text-red-600">Returned by supervisor</p>
-              <p className="text-sm text-red-700">{session.supervisorReturnNote}</p>
-            </div>
-          )}
-          {session.reviewStatus === "approved" && (
-            <div className="bg-green-50 border border-green-200 rounded-md px-5 py-3 text-center">
-              <p className="text-xs font-medium text-green-600">
-                Approved by supervisor{session.reviewedAt ? ` · ${moment(session.reviewedAt).format("MMM D, YYYY")}` : ""}
-              </p>
-              {session.supervisorNote && (
-                <p className="text-sm text-gray-700 mt-1">{session.supervisorNote}</p>
-              )}
-            </div>
-          )}
-          {session.reviewStatus === "submitted" && (
-            <div className="bg-white border border-gray-200 rounded-md px-5 py-3 text-center">
-              <p className="text-xs text-gray-400">Awaiting supervisor review</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowClosePanel(false)}
+                  className="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  disabled={closing}
+                  className="flex-1 bg-brand-yellow text-gray-900 text-sm font-medium py-2.5 rounded-xl hover:brightness-95 transition disabled:opacity-50"
+                >
+                  {closing ? "Closing…" : "Confirm & Submit for Review"}
+                </button>
+              </div>
             </div>
           )}
         </div>
-      )}
 
-      {/* Supervisor Review — approve or return */}
-      {isSupervisor && isClosed && session.logged && session.reviewStatus !== "approved" && session.reviewStatus !== "returned" && (
-        <div>
-          <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-2">
-            Supervisor Review
-          </h2>
-          <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-3">
-            <textarea
-              value={coachingNote}
-              onChange={(e) => setCoachingNote(e.target.value)}
-              rows={3}
-              placeholder="Coaching notes (optional for approval, required to return)..."
-              className="w-full text-sm border border-gray-200 rounded-md px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow placeholder-gray-400 resize-none"
-            />
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={!coachingNote.trim()}
-                onClick={() => { returnSession(session.id, coachingNote); toast.success("Returned to navigator"); }}
-                className="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2.5 rounded-md hover:bg-gray-50 transition disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Return to Navigator
-              </button>
-              <button
-                type="button"
-                onClick={() => { approveSession(session.id, coachingNote); toast.success("Session approved"); }}
-                className="flex-1 bg-brand-yellow text-gray-900 text-sm font-medium py-2.5 rounded-md hover:brightness-95 transition"
-              >
-                Approve
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Supervisor Review — read-only after decision */}
-      {isSupervisor && (session.reviewStatus === "approved" || session.reviewStatus === "returned") && (
-        <div>
-          <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-2">
-            Supervisor Review
-          </h2>
-          <div className="bg-white border border-gray-200 rounded-md px-5 py-4 space-y-2">
-            {session.reviewStatus === "approved" ? (
-              <p className="text-xs text-green-600 font-medium" suppressHydrationWarning>
-                Approved{session.reviewedAt ? ` · ${moment(session.reviewedAt).format("MMM D, YYYY [at] h:mm A")}` : ""}
-              </p>
-            ) : (
-              <p className="text-xs text-red-500 font-medium">Returned to navigator</p>
-            )}
-            {session.supervisorNote && (
-              <p className="text-sm text-gray-700">{session.supervisorNote}</p>
-            )}
-          </div>
-        </div>
-      )}
-
-        <ReferralForm
-          sessionId={session.id}
-          open={referralOpen}
-          onClose={() => setReferralOpen(false)}
+        {/* Drag handle */}
+        <div
+          onMouseDown={() => { isDragging.current = true; document.body.style.cursor = "col-resize"; }}
+          className="w-1.5 flex-shrink-0 bg-gray-200 hover:bg-brand-yellow cursor-col-resize transition-colors"
         />
-        </div>{/* end detail content */}
 
-        {/* Chat panel with drag-to-resize */}
-        {chatOpen && (
-          <>
-            <div
-              onMouseDown={handleDragStart}
-              className="w-1 flex-shrink-0 bg-gray-200 hover:bg-brand-yellow cursor-col-resize transition-colors select-none"
-              title="Drag to resize"
-            />
-            <div
-              ref={chatPanelRef}
-              className="flex-shrink-0 border-l border-gray-200 overflow-hidden flex flex-col"
-            >
-              <NavigatorChatPanel
-                sessionId={sessionId}
-                onClose={() => setChatOpen(false)}
+        {/* Right panel — chat */}
+        <div className="flex-1 flex flex-col min-w-0 bg-gray-100">
+          <div className="px-4 py-2.5 bg-white border-b border-gray-200 flex-shrink-0">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              {isClosed ? "Chat Transcript" : "Live Chat"}
+            </p>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+            {messages.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-sm text-gray-400">No messages yet.</p>
+              </div>
+            ) : (
+              messages.map((msg, i) => {
+                const ts = moment(msg.timestamp).format("h:mm A");
+                if (msg.role === "navigator") {
+                  return (
+                    <div key={msg.id} className="flex flex-col items-end mb-3 max-w-[80%] ml-auto">
+                      <div className="bg-brand-yellow text-gray-900 text-sm px-4 py-2.5 rounded-2xl rounded-br-sm w-fit">
+                        {msg.content}
+                      </div>
+                      <span className="text-[10px] text-gray-400 mt-1 mr-1">{ts}</span>
+                    </div>
+                  );
+                }
+                const prevMsg = messages[i - 1];
+                const showAvatar = !prevMsg || prevMsg.role !== "user";
+                return (
+                  <div key={msg.id} className={cn("flex gap-3 mb-3 max-w-[80%]", !showAvatar && "pl-11")}>
+                    {showAvatar ? <UserAvatar /> : <div className="w-8 flex-shrink-0" />}
+                    <div className="flex flex-col">
+                      <div className="bg-white text-gray-900 text-sm px-4 py-2.5 rounded-2xl rounded-tl-sm shadow-sm w-fit">
+                        {msg.content}
+                      </div>
+                      <span className="text-[10px] text-gray-400 mt-1 ml-1">{ts}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {sendError && (
+            <p className="px-4 py-1 text-xs text-red-500 bg-white border-t border-gray-100">{sendError}</p>
+          )}
+
+          {!isClosed && (
+            <div className="px-4 py-3 bg-white border-t border-gray-200 flex items-center gap-3 flex-shrink-0">
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                placeholder="Reply…"
+                className="flex-1 text-sm text-gray-700 bg-transparent outline-none placeholder-gray-400"
               />
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={!inputValue.trim()}
+                className="w-9 h-9 bg-brand-yellow rounded-full flex items-center justify-center hover:brightness-95 transition disabled:opacity-40"
+                aria-label="Send message"
+              >
+                <Send size={15} strokeWidth={2} className="text-gray-900" />
+              </button>
             </div>
-          </>
-        )}
-      </div>{/* end flex row */}
-    </DashboardShell>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

@@ -1,256 +1,175 @@
-"use client";
-
-import { useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
-import { useStore } from "@/lib/store";
-import type { Navigator } from "@/lib/store";
+import { auth0 } from "@/lib/auth0";
+import { lambdaFetch } from "@/lib/lambda";
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import moment from "moment";
 import DashboardShell from "@/components/DashboardShell";
-import SessionCard from "@/components/SessionCard";
+import SessionStatusBadge from "@/components/SessionStatusBadge";
 
-function loadBarClass(active: number, capacity: number): string {
-  if (capacity === 0 || active === 0) return "w-0";
-  const r = active / capacity;
-  if (r >= 1) return "w-full";
-  if (r >= 0.75) return "w-3/4";
-  if (r >= 0.5) return "w-1/2";
-  if (r >= 0.25) return "w-1/4";
-  return "w-1/12";
+interface Session {
+  id: string;
+  navigator_id: string | null;
+  need_category: string;
+  language: string | null;
+  status: string;
+  created_at: string;
+  closed_at: string | null;
+  submitted_for_review: boolean | null;
+  approved: boolean | null;
+  notes: string | null;
+  outcome: string[] | null;
+  follow_up_date: string | null;
+  coaching_notes: string | null;
 }
 
-function NavigatorRow({
-  navigator,
-  expanded,
-  onToggle,
-}: {
-  navigator: Navigator;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  const allSessions = useStore((s) => s.sessions);
-  const sessions = allSessions
-    .filter((s) => s.navigatorId === navigator.id && s.status !== "closed")
-    .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+interface NavProfile {
+  id: string;
+  auth0_user_id: string;
+  nav_group: string;
+  status: string;
+  capacity: number;
+}
 
-  const activeCount = sessions.filter((s) => s.status === "active" || s.status === "queued").length;
-  const closedCount = sessions.filter((s) => s.status === "closed").length;
-  const isHighLoad = navigator.capacity > 0 && activeCount / navigator.capacity > 0.75;
-  const hasSubmitted = sessions.some((s) => s.reviewStatus === "submitted");
+function mapStatus(s: Session): "queued" | "active" | "closed" {
+  if (s.status === "unassigned") return "queued";
+  if (s.status === "closed") return "closed";
+  return "active";
+}
 
+function SessionRow({ session, navigators }: { session: Session; navigators: NavProfile[] }) {
+  const nav = navigators.find((n) => n.id === session.navigator_id);
   return (
-    <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center gap-3 px-5 py-4 hover:bg-gray-50 transition text-left"
-      >
-        <div className="w-10 h-10 rounded-full bg-brand-yellow flex items-center justify-center flex-shrink-0 relative">
-          <span className="text-xs font-medium text-gray-900">{navigator.avatarInitials}</span>
-          <span
-            className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${navigator.available ? "bg-green-500" : "bg-gray-400"}`}
-          />
+    <Link
+      href={`/dashboard/supervisor/${session.id}`}
+      className="block bg-white border border-gray-200 rounded-xl px-4 py-3.5 hover:border-gray-300 hover:shadow-md transition"
+    >
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-brand-yellow flex items-center justify-center flex-shrink-0">
+          <span className="text-xs font-medium text-gray-900">
+            {session.need_category.slice(0, 2).toUpperCase()}
+          </span>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <p className="text-sm font-medium text-gray-900">{navigator.name}</p>
-            {hasSubmitted && (
-              <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+          <p className="text-sm font-medium text-gray-900 capitalize">
+            {session.need_category.replace(/_/g, " ")}
+          </p>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            {nav && (
+              <span className="text-xs text-gray-500">{nav.nav_group}</span>
             )}
-          </div>
-          <div className="flex gap-2 mt-0.5 items-center">
-            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
-              {activeCount} active
-            </span>
-            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">
-              {closedCount} closed
-            </span>
+            {session.language && (
+              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                {session.language.toUpperCase()}
+              </span>
+            )}
             <span className="text-xs text-gray-400">
-              {activeCount}/{navigator.capacity}
+              {moment(session.created_at).calendar(null, {
+                sameDay: "[Today at] h:mm A",
+                lastDay: "[Yesterday at] h:mm A",
+                lastWeek: "MMM D [at] h:mm A",
+                sameElse: "MMM D, YYYY [at] h:mm A",
+              })}
             </span>
           </div>
-          <div className="mt-1.5 h-1 w-full bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all ${loadBarClass(activeCount, navigator.capacity)} ${isHighLoad ? "bg-amber-400" : "bg-green-400"}`}
-            />
-          </div>
         </div>
-        {expanded ? (
-          <ChevronUp size={16} className="text-gray-400 flex-shrink-0" />
-        ) : (
-          <ChevronDown size={16} className="text-gray-400 flex-shrink-0" />
-        )}
-      </button>
-
-      {expanded && sessions.length > 0 && (
-        <div className="border-t border-gray-100 px-3 py-3 space-y-2 bg-gray-50">
-          {sessions.map((session) => (
-            <SessionCard key={session.id} session={session} viewerRole="supervisor" />
-          ))}
-        </div>
-      )}
-
-      {expanded && sessions.length === 0 && (
-        <div className="border-t border-gray-100 px-5 py-4 bg-gray-50 text-center">
-          <p className="text-sm text-gray-400">No sessions</p>
-        </div>
-      )}
-    </div>
+        <SessionStatusBadge status={mapStatus(session)} size="sm" />
+      </div>
+    </Link>
   );
 }
 
-export default function SupervisorDashboardPage() {
-  const sessions = useStore((s) => s.sessions);
-  const navigators = useStore((s) => s.navigators);
-  const [expandedNavId, setExpandedNavId] = useState<string | null>(null);
+export default async function SupervisorDashboardPage() {
+  const session = await auth0.getSession();
+  if (!session) redirect("/auth/login");
 
-  const totalSessions = sessions.length;
-  const activeNow = sessions.filter(
-    (s) => (s.status === "active" || s.status === "queued") && s.navigatorId !== null
-  ).length;
-  const newRequests = sessions.filter((s) => s.navigatorId === null).length;
-  const totalReferrals = sessions.reduce((sum, s) => sum + s.referrals.length, 0);
-  const awaitingReview = sessions.filter((s) => s.reviewStatus === "submitted").length;
+  const [sessionsRes, navsRes] = await Promise.all([
+    lambdaFetch("/sessions"),
+    lambdaFetch("/navigators"),
+  ]);
 
-  const needsReview = sessions
-    .filter((s) => s.reviewStatus === "submitted")
-    .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+  const sessionsBody = await sessionsRes.json().catch(() => []);
+  const navsBody = await navsRes.json().catch(() => []);
 
-  const approvedArchive = sessions
-    .filter((s) => s.reviewStatus === "approved")
-    .sort((a, b) => new Date(b.reviewedAt ?? b.startedAt).getTime() - new Date(a.reviewedAt ?? a.startedAt).getTime());
+  const allSessions: Session[] = sessionsRes.ok ? sessionsBody : [];
+  const navigators: NavProfile[] = navsRes.ok ? navsBody : [];
 
-  const metricsStrip = (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-      <div className="bg-white border border-gray-200 rounded-md px-4 py-4 text-center">
-        <p className="text-3xl font-normal text-gray-900">{totalSessions}</p>
-        <p className="text-xs text-gray-500 mt-1">Total Sessions</p>
-      </div>
-      <div className="bg-white border border-gray-200 rounded-md px-4 py-4 text-center">
-        <p className="text-3xl font-normal text-green-700">{activeNow}</p>
-        <p className="text-xs text-gray-500 mt-1">Active</p>
-      </div>
-      <div className="bg-white border border-gray-200 rounded-md px-4 py-4 text-center">
-        <p className={`text-3xl font-normal ${newRequests > 0 ? "text-amber-600" : "text-gray-900"}`}>
-          {newRequests}
-        </p>
-        <p className={`text-xs mt-1 font-medium ${newRequests > 0 ? "text-amber-600" : "text-gray-500"}`}>
-          New Requests
-        </p>
-      </div>
-      <div className="bg-white border border-gray-200 rounded-md px-4 py-4 text-center">
-        <p className="text-3xl font-normal text-blue-600">{totalReferrals}</p>
-        <p className="text-xs text-gray-500 mt-1">Total Referrals</p>
-      </div>
-      <div className="bg-white border border-gray-200 rounded-md px-4 py-4 text-center">
-        <p className={`text-3xl font-normal ${awaitingReview > 0 ? "text-amber-600" : "text-gray-900"}`}>{awaitingReview}</p>
-        <p className={`text-xs mt-1 ${awaitingReview > 0 ? "text-amber-600 font-medium" : "text-gray-500"}`}>Awaiting Review</p>
-      </div>
-    </div>
-  );
+  const byRecent = (a: Session, b: Session) =>
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+
+  const needsReview = allSessions
+    .filter((s) => s.submitted_for_review === true && s.approved !== true)
+    .sort(byRecent);
+
+  const active = allSessions
+    .filter((s) => s.status !== "closed")
+    .sort(byRecent);
+
+  const approvedArchive = allSessions
+    .filter((s) => s.approved === true)
+    .sort(byRecent);
 
   return (
-    <DashboardShell title="Sessions" role="supervisor" fullWidth>
-      {/* ── Mobile layout (< lg) ── */}
-      <div className="lg:hidden px-4 py-5 space-y-5">
-        {metricsStrip}
+    <DashboardShell title="Overview" role="supervisor">
+      {/* Summary strip */}
+      <div className="flex gap-4 bg-white border border-gray-200 rounded-xl px-5 py-4">
+        <div className="flex-1 text-center">
+          <p className={`text-2xl font-normal ${needsReview.length > 0 ? "text-amber-600" : "text-gray-900"}`}>
+            {needsReview.length}
+          </p>
+          <p className={`text-xs font-medium mt-0.5 ${needsReview.length > 0 ? "text-amber-600" : "text-gray-400"}`}>
+            Needs Review
+          </p>
+        </div>
+        <div className="w-px bg-gray-200" />
+        <div className="flex-1 text-center">
+          <p className="text-2xl font-normal text-green-700">{active.length}</p>
+          <p className="text-xs text-green-600 font-medium mt-0.5">Active</p>
+        </div>
+        <div className="w-px bg-gray-200" />
+        <div className="flex-1 text-center">
+          <p className="text-2xl font-normal text-gray-900">{approvedArchive.length}</p>
+          <p className="text-xs text-gray-400 font-medium mt-0.5">Approved</p>
+        </div>
+      </div>
 
-        <section>
-          <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Needs Review</h2>
-          {needsReview.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-md px-5 py-8 text-center">
-              <p className="text-sm text-gray-400">No sessions awaiting review</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {needsReview.map((session) => (
-                <SessionCard key={session.id} session={session} viewerRole="supervisor" />
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section>
-          <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">By Navigator</h2>
-          <div className="space-y-2">
-            {navigators.map((nav) => (
-              <NavigatorRow
-                key={nav.id}
-                navigator={nav}
-                expanded={expandedNavId === nav.id}
-                onToggle={() => setExpandedNavId(expandedNavId === nav.id ? null : nav.id)}
-              />
-            ))}
+      <section>
+        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Needs Review</h2>
+        {needsReview.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center">
+            <p className="text-sm text-gray-400">No sessions pending review</p>
           </div>
-        </section>
-
-        {approvedArchive.length > 0 && (
-          <section>
-            <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Approved Archive</h2>
-            <div className="space-y-2">
-              {approvedArchive.map((session) => (
-                <SessionCard key={session.id} session={session} viewerRole="supervisor" />
-              ))}
-            </div>
-          </section>
+        ) : (
+          <div className="space-y-2">
+            {needsReview.map((s) => <SessionRow key={s.id} session={s} navigators={navigators} />)}
+          </div>
         )}
-      </div>
+      </section>
 
-      {/* ── Desktop layout (lg+) ── */}
-      <div className="hidden lg:flex h-full overflow-hidden">
-        {/* Left column: Needs Review */}
-        <div className="flex-[2] min-w-0 border-r border-gray-200 overflow-y-auto px-6 py-5 space-y-5">
-          <section>
-            <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">
-              Needs Review
-              {awaitingReview > 0 && (
-                <span className="ml-2 bg-amber-100 text-amber-700 text-[10px] font-medium px-1.5 py-0.5 rounded-full">
-                  {awaitingReview}
-                </span>
-              )}
-            </h2>
-            {needsReview.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-md px-5 py-8 text-center">
-                <p className="text-sm text-gray-400">No sessions awaiting review</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {needsReview.map((session) => (
-                  <SessionCard key={session.id} session={session} viewerRole="supervisor" />
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
+      <section>
+        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Active</h2>
+        {active.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center">
+            <p className="text-sm text-gray-400">No active sessions</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {active.map((s) => <SessionRow key={s.id} session={s} navigators={navigators} />)}
+          </div>
+        )}
+      </section>
 
-        {/* Right column: Metrics + By Navigator + Archive */}
-        <div className="flex-[3] min-w-0 overflow-y-auto px-6 py-5 space-y-5">
-          {metricsStrip}
-
-          <section>
-            <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">By Navigator</h2>
-            <div className="space-y-2">
-              {navigators.map((nav) => (
-                <NavigatorRow
-                  key={nav.id}
-                  navigator={nav}
-                  expanded={expandedNavId === nav.id}
-                  onToggle={() => setExpandedNavId(expandedNavId === nav.id ? null : nav.id)}
-                />
-              ))}
-            </div>
-          </section>
-
-          {approvedArchive.length > 0 && (
-            <section>
-              <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Approved Archive</h2>
-              <div className="space-y-2">
-                {approvedArchive.map((session) => (
-                  <SessionCard key={session.id} session={session} viewerRole="supervisor" />
-                ))}
-              </div>
-            </section>
-          )}
-        </div>
-      </div>
+      <section>
+        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Approved Archive</h2>
+        {approvedArchive.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center">
+            <p className="text-sm text-gray-400">No approved sessions yet</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {approvedArchive.map((s) => <SessionRow key={s.id} session={s} navigators={navigators} />)}
+          </div>
+        )}
+      </section>
     </DashboardShell>
   );
 }
