@@ -37,7 +37,7 @@ function SessionRow({ session }: { session: RealSession }) {
   return (
     <Link
       href={`/dashboard/navigator/${session.id}`}
-      className="block bg-white border border-gray-200 rounded-xl px-4 py-3.5 hover:border-gray-300 hover:shadow-md transition"
+      className="block bg-white border border-gray-200 rounded-xl px-5 py-4 hover:border-gray-300 hover:shadow-md transition"
     >
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-full bg-brand-yellow flex items-center justify-center flex-shrink-0">
@@ -81,168 +81,90 @@ export default async function NavigatorDashboardPage() {
     lambdaFetch("/navigators"),
   ]);
 
-  const sessionsBody = await sessionsRes.json().catch(() => ({}));
-  const navsBody = await navsRes.json().catch(() => ({}));
+  const sessionsBody = await sessionsRes.json().catch(() => [] as RealSession[]);
+  const navsBody = await navsRes.json().catch(() => [] as NavProfile[]);
 
-function sortByUrgency(
-  sessions: Session[],
-  chatMessages: Record<string, ChatMessage[]>
-): Session[] {
-  return [...sessions].sort((a, b) => {
-    const aU = hasUnresponded24h(a.id, chatMessages);
-    const bU = hasUnresponded24h(b.id, chatMessages);
-    if (aU !== bU) return aU ? -1 : 1;
-    const aR = a.reviewStatus === "returned";
-    const bR = b.reviewStatus === "returned";
-    if (aR !== bR) return aR ? -1 : 1;
-    return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
-  });
-}
+  const allSessions: RealSession[] = sessionsRes.ok && Array.isArray(sessionsBody) ? sessionsBody : [];
+  const navigators: NavProfile[] = navsRes.ok && Array.isArray(navsBody) ? navsBody : [];
 
-export default function NavigatorDashboardPage() {
-  const allSessions = useStore((s) => s.sessions);
-  const chatMessages = useStore((s) => s.chatMessages);
+  const byRecent = (a: RealSession, b: RealSession) =>
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
 
-  const byRecent = (a: Session, b: Session) =>
-    new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
+  const myProfile = navigators.find((n) => n.auth0_user_id === session.user.sub);
 
-  const mySessions = allSessions.filter((s) => s.navigatorId === DEMO_NAVIGATOR_ID);
-  const newRequests = allSessions.filter((s) => s.navigatorId === null).sort(byRecent);
-  const active = mySessions.filter((s) => s.status !== "closed");
-  const past = mySessions.filter((s) => s.status === "closed");
-
-  const activeCount = active.length;
-  const newCount = newRequests.length;
-  const closedCount = past.length;
-
-  // Navigator only receives their own sessions from the Lambda (role-filtered),
-  // but unassigned sessions have navigator_id=null so they come through too.
   const mySessions = myProfile
     ? allSessions.filter((s) => s.navigator_id === myProfile.id)
     : [];
-
   const unassigned = allSessions.filter((s) => s.navigator_id === null).sort(byRecent);
   const active = mySessions.filter((s) => s.status !== "closed").sort(byRecent);
-  // Closed = submitted for review (closed and sent to supervisor)
   const closed = mySessions.filter((s) => s.status === "closed").sort(byRecent);
 
   return (
     <DashboardShell title="My Sessions" role="navigator" fullWidth>
-      {/* ── Mobile layout (< lg) ── */}
-      <div className="lg:hidden px-4 py-5 space-y-5">
-        {summaryStrip}
-
-        <section>
-          <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Active</h2>
-          {active.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-md px-5 py-8 text-center">
-              <p className="text-sm text-gray-400">No active sessions</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {sortByUrgency(active, chatMessages).map((session) => (
-                <SessionCard
-                  key={session.id}
-                  session={session}
-                  viewerRole="navigator"
-                  urgent24h={hasUnresponded24h(session.id, chatMessages)}
-                />
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section>
-          <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">New Requests</h2>
-          {newRequests.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-md px-5 py-8 text-center">
-              <p className="text-sm text-gray-400">No new requests</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {newRequests.map((session) => (
-                <SessionCard key={session.id} session={session} viewerRole="navigator" />
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section>
-          <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Past Sessions</h2>
-          {past.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-md px-5 py-8 text-center">
-              <p className="text-sm text-gray-400">No closed sessions yet</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {sortByUrgency(past, chatMessages).map((session) => (
-                <SessionCard
-                  key={session.id}
-                  session={session}
-                  viewerRole="navigator"
-                  urgent24h={hasUnresponded24h(session.id, chatMessages)}
-                />
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
-
-      {/* Summary strip */}
-      <div className="flex gap-4 bg-white border border-gray-200 rounded-xl px-5 py-4">
-        <div className="flex-1 text-center">
-          <p className="text-2xl font-normal text-gray-900">{active.length}</p>
-          <p className="text-xs text-green-600 font-medium mt-0.5">Active</p>
+      <div className="flex gap-3 sm:gap-5 bg-white border border-gray-200 rounded-2xl px-4 sm:px-6 py-5 sm:py-6 shadow-sm">
+        <div className="flex-1 text-center min-w-0">
+          <p className="text-2xl sm:text-3xl font-normal tabular-nums text-gray-900">{active.length}</p>
+          <p className="text-xs text-green-600 font-medium mt-1.5">Active</p>
         </div>
-        <div className="w-px bg-gray-200" />
-        <div className="flex-1 text-center">
-          <p className={`text-2xl font-normal mt-0.5 ${unassigned.length > 0 ? "text-amber-600" : "text-gray-900"}`}>
+        <div className="w-px flex-shrink-0 self-stretch bg-gray-200 my-0.5" />
+        <div className="flex-1 text-center min-w-0">
+          <p
+            className={`text-2xl sm:text-3xl font-normal tabular-nums ${
+              unassigned.length > 0 ? "text-amber-600" : "text-gray-900"
+            }`}
+          >
             {unassigned.length}
           </p>
-          <p className="text-xs text-amber-600 font-medium mt-0.5">Unassigned</p>
+          <p className="text-xs text-amber-600 font-medium mt-1.5">Unassigned</p>
         </div>
-        <div className="w-px bg-gray-200" />
-        <div className="flex-1 text-center">
-          <p className="text-2xl font-normal text-gray-900">{closed.length}</p>
-          <p className="text-xs text-gray-400 font-medium mt-0.5">Closed</p>
+        <div className="w-px flex-shrink-0 self-stretch bg-gray-200 my-0.5" />
+        <div className="flex-1 text-center min-w-0">
+          <p className="text-2xl sm:text-3xl font-normal tabular-nums text-gray-900">{closed.length}</p>
+          <p className="text-xs text-gray-400 font-medium mt-1.5">Closed</p>
         </div>
       </div>
 
-      <section>
-        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Active</h2>
+      <section className="space-y-4">
+        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider">Active</h2>
         {active.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center">
+          <div className="bg-white border border-gray-200 rounded-2xl px-5 py-10 text-center">
             <p className="text-sm text-gray-400">No active sessions</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {active.map((s) => <SessionRow key={s.id} session={s} />)}
+          <div className="space-y-3">
+            {active.map((s) => (
+              <SessionRow key={s.id} session={s} />
+            ))}
           </div>
         )}
       </section>
 
-      <section>
-        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Unassigned</h2>
+      <section className="space-y-4">
+        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider">Unassigned</h2>
         {unassigned.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center">
+          <div className="bg-white border border-gray-200 rounded-2xl px-5 py-10 text-center">
             <p className="text-sm text-gray-400">No unassigned sessions</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {unassigned.map((s) => <SessionRow key={s.id} session={s} />)}
+          <div className="space-y-3">
+            {unassigned.map((s) => (
+              <SessionRow key={s.id} session={s} />
+            ))}
           </div>
         )}
       </section>
 
-      <section>
-        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Closed</h2>
+      <section className="space-y-4">
+        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider">Closed</h2>
         {closed.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center">
+          <div className="bg-white border border-gray-200 rounded-2xl px-5 py-10 text-center">
             <p className="text-sm text-gray-400">No closed sessions yet</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {closed.map((s) => <SessionRow key={s.id} session={s} />)}
+          <div className="space-y-3">
+            {closed.map((s) => (
+              <SessionRow key={s.id} session={s} />
+            ))}
           </div>
         )}
       </section>

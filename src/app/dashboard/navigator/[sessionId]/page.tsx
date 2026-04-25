@@ -65,7 +65,6 @@ const EVENT_LABELS: Record<SessionEvent["event_type"], string> = {
   assigned: "Assigned to navigator",
   transferred: "Transferred",
   closed: "Session closed",
-  returned: "Returned to navigator",
 };
 
 function EventIcon({ type }: { type: SessionEvent["event_type"] }) {
@@ -73,7 +72,6 @@ function EventIcon({ type }: { type: SessionEvent["event_type"] }) {
   if (type === "created") return <Circle size={14} className={`${cls} text-gray-400`} />;
   if (type === "assigned") return <UserPlus size={14} className={`${cls} text-blue-400`} />;
   if (type === "transferred") return <ArrowRight size={14} className={`${cls} text-amber-500`} />;
-  if (type === "returned") return <RotateCcw size={14} className={`${cls} text-orange-400`} />;
   return <CheckCircle size={14} className={`${cls} text-green-500`} />;
 }
 
@@ -96,6 +94,7 @@ function UserAvatar() {
 
 export default function NavigatorSessionDetailPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const router = useRouter();
 
   const [session, setSession] = useState<Session | null>(null);
   const [navigators, setNavigators] = useState<NavProfile[]>([]);
@@ -128,15 +127,15 @@ export default function NavigatorSessionDetailPage() {
   // Resizable split panel
   const [leftWidth, setLeftWidth] = useState(420);
   const containerRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
+  const isSplitDragging = useRef(false);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
-      if (!isDragging.current || !containerRef.current) return;
+      if (!isSplitDragging.current || !containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       setLeftWidth(Math.max(260, Math.min(rect.width - 300, e.clientX - rect.left)));
     };
-    const onUp = () => { isDragging.current = false; document.body.style.cursor = ""; };
+    const onUp = () => { isSplitDragging.current = false; document.body.style.cursor = ""; };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
     return () => { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
@@ -290,53 +289,6 @@ export default function NavigatorSessionDetailPage() {
       </div>
     );
   }
-
-  // Wrap-up form state
-  const [wrapOutcome, setWrapOutcome] = useState<SessionLog["outcome"]>([]);
-  const [wrapNotes, setWrapNotes] = useState("");
-  const [wrapFollowUp, setWrapFollowUp] = useState(false);
-  const [wrapFollowUpDate, setWrapFollowUpDate] = useState("");
-
-  // Supervisor review state
-  const [coachingNote, setCoachingNote] = useState(session?.supervisorNote ?? "");
-
-  // Chat slide panel
-  const [chatOpen, setChatOpen] = useState(true);
-  const chatPanelRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
-  const dragStartX = useRef(0);
-  const dragStartWidth = useRef(0);
-
-  useEffect(() => {
-    if (chatOpen && chatPanelRef.current) {
-      const half = Math.round(chatPanelRef.current.parentElement!.offsetWidth / 2);
-      chatPanelRef.current.style.width = `${half}px`;
-      dragStartWidth.current = half;
-    }
-  }, [chatOpen]);
-
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
-    isDragging.current = true;
-    dragStartX.current = e.clientX;
-    dragStartWidth.current = chatPanelRef.current?.offsetWidth ?? CHAT_DEFAULT_WIDTH;
-    e.preventDefault();
-  }, []);
-
-  useEffect(() => {
-    const onMouseMove = (e: MouseEvent) => {
-      if (!isDragging.current || !chatPanelRef.current) return;
-      const delta = dragStartX.current - e.clientX;
-      const newWidth = Math.min(CHAT_MAX_WIDTH, Math.max(CHAT_MIN_WIDTH, dragStartWidth.current + delta));
-      chatPanelRef.current.style.width = `${newWidth}px`;
-    };
-    const onMouseUp = () => { isDragging.current = false; };
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-  }, []);
 
   if (!session) {
     return (
@@ -536,7 +488,7 @@ export default function NavigatorSessionDetailPage() {
 
         {/* Drag handle */}
         <div
-          onMouseDown={() => { isDragging.current = true; document.body.style.cursor = "col-resize"; }}
+          onMouseDown={() => { isSplitDragging.current = true; document.body.style.cursor = "col-resize"; }}
           className="w-1.5 flex-shrink-0 bg-gray-200 hover:bg-brand-yellow cursor-col-resize transition-colors"
         />
 
