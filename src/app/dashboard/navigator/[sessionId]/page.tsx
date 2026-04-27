@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Send, Circle, UserPlus, ArrowRight, CheckCircle } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Send, Circle, UserPlus, ArrowRight, CheckCircle, Home } from "lucide-react";
 import moment from "moment";
 import { cn } from "@/lib/utils";
 
@@ -125,15 +126,16 @@ export default function NavigatorSessionDetailPage() {
   const seenEventIds = useRef<Set<string>>(new Set());
 
   // Resizable split panel
-  const [leftWidth, setLeftWidth] = useState(420);
   const containerRef = useRef<HTMLDivElement>(null);
+  const leftPanelRef = useRef<HTMLDivElement>(null);
   const isSplitDragging = useRef(false);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (!isSplitDragging.current || !containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
-      setLeftWidth(Math.max(260, Math.min(rect.width - 300, e.clientX - rect.left)));
+      const w = Math.max(260, Math.min(rect.width - 300, e.clientX - rect.left));
+      if (leftPanelRef.current) leftPanelRef.current.style.width = `${w}px`;
     };
     const onUp = () => { isSplitDragging.current = false; document.body.style.cursor = ""; };
     document.addEventListener("mousemove", onMove);
@@ -307,10 +309,13 @@ export default function NavigatorSessionDetailPage() {
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
       <header className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
+        <Link href="/" aria-label="Home" className="p-1 -ml-1 text-gray-500 hover:text-gray-800 transition">
+          <Home size={18} />
+        </Link>
         <button
           type="button"
           onClick={() => router.push("/dashboard/navigator")}
-          className="p-1 -ml-1 text-gray-500 hover:text-gray-800 transition"
+          className="p-1 text-gray-500 hover:text-gray-800 transition"
           aria-label="Back"
         >
           <ArrowLeft size={20} strokeWidth={2} />
@@ -318,7 +323,7 @@ export default function NavigatorSessionDetailPage() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-gray-900 capitalize">{categoryLabel}</p>
           <p className="text-xs text-gray-400">
-            {isClosed ? "Closed" : session.status} · Started {moment(session.created_at).format("MMM D, YYYY")}
+            {isClosed ? "Closed" : "Active"} · Started {moment(session.created_at).format("MMM D, YYYY")}
           </p>
         </div>
         <span className={cn(
@@ -327,14 +332,17 @@ export default function NavigatorSessionDetailPage() {
           session.status === "active" ? "bg-green-100 text-green-700" :
           "bg-amber-100 text-amber-700"
         )}>
-          {isClosed ? "Closed" : session.status}
+          {isClosed ? "Closed" : "Active"}
         </span>
+        <a href="https://www.google.com" className="flex items-center gap-1.5 text-brand-exit text-xs font-medium uppercase tracking-wide">
+          Quick Exit <span className="w-5 h-5 rounded-full bg-brand-exit text-white flex items-center justify-center font-bold text-[11px]">!</span>
+        </a>
       </header>
 
       {/* Split layout */}
       <div ref={containerRef} className="flex flex-1 overflow-hidden">
         {/* Left panel — session details */}
-        <div style={{ width: leftWidth }} className="flex-shrink-0 overflow-y-auto bg-white p-5 space-y-5">
+        <div ref={leftPanelRef} className="w-[420px] flex-shrink-0 overflow-y-auto bg-white p-5 space-y-5">
 
           {/* Session info */}
           <div className="space-y-1 text-sm text-gray-600">
@@ -355,6 +363,7 @@ export default function NavigatorSessionDetailPage() {
           <div>
             <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Session Notes</h2>
             <textarea
+              aria-label="Session notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               onBlur={saveNotes}
@@ -459,6 +468,7 @@ export default function NavigatorSessionDetailPage() {
                 <p className="text-xs text-gray-500 mb-1">Follow-up date (optional)</p>
                 <input
                   type="date"
+                  aria-label="Follow-up date"
                   value={followUpDate}
                   onChange={(e) => setFollowUpDate(e.target.value)}
                   className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow"
@@ -500,7 +510,7 @@ export default function NavigatorSessionDetailPage() {
             </p>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+          <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col">
             {messages.length === 0 ? (
               <div className="flex items-center justify-center h-full">
                 <p className="text-sm text-gray-400">No messages yet.</p>
@@ -510,7 +520,7 @@ export default function NavigatorSessionDetailPage() {
                 const ts = moment(msg.timestamp).format("h:mm A");
                 if (msg.role === "navigator") {
                   return (
-                    <div key={msg.id} className="flex flex-col items-end mb-3 max-w-[80%] ml-auto">
+                    <div key={msg.id} className="flex flex-col items-end mb-3 max-w-[80%] self-end">
                       <div className="bg-brand-yellow text-gray-900 text-sm px-4 py-2.5 rounded-2xl rounded-br-sm w-fit">
                         {msg.content}
                       </div>
@@ -521,7 +531,7 @@ export default function NavigatorSessionDetailPage() {
                 const prevMsg = messages[i - 1];
                 const showAvatar = !prevMsg || prevMsg.role !== "user";
                 return (
-                  <div key={msg.id} className={cn("flex gap-3 mb-3 max-w-[80%]", !showAvatar && "pl-11")}>
+                  <div key={msg.id} className="flex gap-3 mb-3 max-w-[80%] self-start">
                     {showAvatar ? <UserAvatar /> : <div className="w-8 flex-shrink-0" />}
                     <div className="flex flex-col">
                       <div className="bg-white text-gray-900 text-sm px-4 py-2.5 rounded-2xl rounded-tl-sm shadow-sm w-fit">
@@ -545,6 +555,7 @@ export default function NavigatorSessionDetailPage() {
               <input
                 ref={inputRef}
                 type="text"
+                aria-label="Reply"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSend()}
