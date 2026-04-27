@@ -3,7 +3,8 @@ import { lambdaFetch } from "@/lib/lambda";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import moment from "moment";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Home } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Session {
   id: string;
@@ -75,7 +76,10 @@ function SessionRow({ session, badge }: { session: Session; badge?: React.ReactN
           </span>
         </div>
       </div>
-      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+      <span className={cn(
+        "text-xs font-medium px-2 py-0.5 rounded-full",
+        session.status === "closed" ? "bg-gray-100 text-gray-500" : "bg-green-100 text-green-700"
+      )}>
         {session.status === "closed" ? "Closed" : "Active"}
       </span>
     </Link>
@@ -164,33 +168,44 @@ export default async function SupervisorDashboardPage() {
     .sort(byRecent);
 
   const active = allSessions.filter((s) => s.status !== "closed");
-  const newRequests = allSessions.filter((s) => s.navigator_id === null);
-  const approvedArchive = allSessions.filter((s) => s.approved === true).sort(byRecent);
+const approvedArchive = allSessions.filter((s) => s.approved === true).sort(byRecent);
   const navigatorsWithSessions = navigators.filter((n) =>
     allSessions.some((s) => s.navigator_id === n.id)
   );
-
-  const stats = [
-    { label: "Total Sessions", value: allSessions.length, valueColor: "text-gray-900", labelColor: "text-gray-400" },
-    { label: "Active", value: active.length, valueColor: "text-green-700", labelColor: "text-green-600" },
-    { label: "New Requests", value: newRequests.length, valueColor: newRequests.length > 0 ? "text-amber-600" : "text-gray-900", labelColor: newRequests.length > 0 ? "text-amber-600" : "text-gray-400" },
-    { label: "Awaiting Review", value: needsReview.length, valueColor: needsReview.length > 0 ? "text-amber-600" : "text-gray-900", labelColor: needsReview.length > 0 ? "text-amber-600" : "text-gray-400" },
-  ];
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 flex-shrink-0 sticky top-0 z-30">
         <div className="px-4 sm:px-6 lg:px-8 py-3.5 flex items-center gap-3">
-          <Link href="/" className="font-medium text-sm text-gray-900 hover:opacity-70 transition-opacity">
-            StreetLives
+          <Link href="/" aria-label="Home" className="p-1 -ml-1 text-gray-500 hover:text-gray-800 transition">
+            <Home size={18} />
           </Link>
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-brand-yellow text-gray-900">
-            Supervisor
-          </span>
+          <a href="https://www.google.com" className="ml-auto flex items-center gap-1.5 text-brand-exit text-xs font-medium uppercase tracking-wide">
+            Quick Exit <span className="w-5 h-5 rounded-full bg-brand-exit text-white flex items-center justify-center font-bold text-[11px]">!</span>
+          </a>
         </div>
-        <div className="px-4 sm:px-6 lg:px-8 pb-4 pt-0.5">
-          <h1 className="text-xl font-normal text-gray-900 tracking-tight">Sessions</h1>
+        <div className="px-4 sm:px-6 lg:px-8 pb-3 pt-0.5 flex items-end justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-normal text-gray-900 tracking-tight">My Sessions</h1>
+            <span className="text-sm font-medium px-2.5 py-0.5 rounded-full bg-brand-yellow text-gray-900">Supervisor</span>
+          </div>
+          <div className="flex items-center gap-5 pb-0.5">
+            <div className="text-center">
+              <span className={`text-lg font-normal tabular-nums ${needsReview.length > 0 ? "text-amber-600" : "text-gray-900"}`}>{needsReview.length}</span>
+              <span className={`text-xs font-medium ml-1.5 ${needsReview.length > 0 ? "text-amber-600" : "text-gray-400"}`}>Awaiting Review</span>
+            </div>
+            <div className="w-px h-4 bg-gray-200" />
+            <div className="text-center">
+              <span className="text-lg font-normal tabular-nums text-green-700">{active.length}</span>
+              <span className="text-xs text-green-600 font-medium ml-1.5">Active</span>
+            </div>
+            <div className="w-px h-4 bg-gray-200" />
+            <div className="text-center">
+              <span className="text-lg font-normal tabular-nums text-gray-900">{approvedArchive.length}</span>
+              <span className="text-xs text-gray-400 font-medium ml-1.5">Approved</span>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -227,16 +242,6 @@ export default async function SupervisorDashboardPage() {
 
         {/* Right: Metrics + By Navigator + Approved Archive */}
         <div className="flex-[3] min-w-0 overflow-y-auto px-5 py-5 space-y-6">
-          {/* Metrics strip */}
-          <div className="grid grid-cols-4 gap-3">
-            {stats.map((stat) => (
-              <div key={stat.label} className="bg-white border border-gray-200 rounded-xl px-3 py-4 text-center">
-                <p className={`text-2xl font-normal ${stat.valueColor}`}>{stat.value}</p>
-                <p className={`text-xs font-medium mt-0.5 ${stat.labelColor}`}>{stat.label}</p>
-              </div>
-            ))}
-          </div>
-
           {/* By Navigator */}
           <section className="space-y-2">
             <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider">By Navigator</h2>

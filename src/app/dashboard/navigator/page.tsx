@@ -3,6 +3,8 @@ import { lambdaFetch } from "@/lib/lambda";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import moment from "moment";
+import { Home } from "lucide-react";
+import { OverdueFlair } from "@/components/OverdueFlair";
 
 interface RealSession {
   id: string;
@@ -51,6 +53,7 @@ function SessionRow({ session }: { session: RealSession }) {
           {session.routing_reason && (
             <span className="text-[10px] bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded-full">Routed</span>
           )}
+          {!isClosed && !isUnassigned && <OverdueFlair createdAt={session.created_at} />}
           <span className="text-xs text-gray-400" suppressHydrationWarning>
             {moment(session.created_at).calendar(null, {
               sameDay: "[Today at] h:mm A",
@@ -114,15 +117,18 @@ export default async function NavigatorDashboardPage() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 flex-shrink-0 sticky top-0 z-30">
         <div className="px-4 sm:px-6 lg:px-8 py-3.5 flex items-center gap-3">
-          <Link href="/" className="font-medium text-sm text-gray-900 hover:opacity-70 transition-opacity">
-            StreetLives
+          <Link href="/" aria-label="Home" className="p-1 -ml-1 text-gray-500 hover:text-gray-800 transition">
+            <Home size={18} />
           </Link>
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-brand-yellow text-gray-900">
-            Navigator
-          </span>
+          <a href="https://www.google.com" className="ml-auto flex items-center gap-1.5 text-brand-exit text-xs font-medium uppercase tracking-wide">
+            Quick Exit <span className="w-5 h-5 rounded-full bg-brand-exit text-white flex items-center justify-center font-bold text-[11px]">!</span>
+          </a>
         </div>
         <div className="px-4 sm:px-6 lg:px-8 pb-3 pt-0.5 flex items-end justify-between">
-          <h1 className="text-xl font-normal text-gray-900 tracking-tight">My Sessions</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-normal text-gray-900 tracking-tight">My Sessions</h1>
+            <span className="text-sm font-medium px-2.5 py-0.5 rounded-full bg-brand-yellow text-gray-900">Navigator</span>
+          </div>
           {/* Metrics strip */}
           <div className="flex items-center gap-5 pb-0.5">
             <div className="text-center">

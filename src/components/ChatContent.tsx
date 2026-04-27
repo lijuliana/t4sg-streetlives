@@ -288,80 +288,6 @@ export function ChatContent({ onClose }: ChatContentProps) {
       );
     });
 
-  // Category + language picker
-  if (chatState === "picker") {
-    return (
-      <div className="flex flex-col h-full bg-gray-100 w-full">
-        <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
-          <div className="w-8" />
-          <span className="font-medium text-base text-gray-900">StreetLives</span>
-          <button
-            type="button"
-            onClick={() => (onClose ? onClose() : router.push("/"))}
-            className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 transition"
-          >
-            CLOSE <X size={18} strokeWidth={2.5} />
-          </button>
-        </header>
-
-        <div className="flex-1 flex flex-col justify-center px-6 gap-6">
-          <div>
-            <p className="text-sm font-medium text-gray-700 mb-2">What do you need help with?</p>
-            <div className="flex flex-wrap gap-2">
-              {NEED_CATEGORIES.map((c) => (
-                <button
-                  key={c.value}
-                  type="button"
-                  onClick={() => setNeedCategory(c.value)}
-                  className={cn(
-                    "px-4 py-2 rounded-xl text-sm border transition",
-                    needCategory === c.value
-                      ? "bg-brand-yellow border-brand-yellow text-gray-900 font-medium"
-                      : "border-gray-300 text-gray-700 hover:border-brand-yellow"
-                  )}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-sm font-medium text-gray-700 mb-2">Preferred language</p>
-            <div className="flex flex-wrap gap-2">
-              {LANGUAGES.map((l) => (
-                <button
-                  key={l.value}
-                  type="button"
-                  onClick={() => setLanguage(l.value)}
-                  className={cn(
-                    "px-4 py-2 rounded-xl text-sm border transition",
-                    language === l.value
-                      ? "bg-brand-yellow border-brand-yellow text-gray-900 font-medium"
-                      : "border-gray-300 text-gray-700 hover:border-brand-yellow"
-                  )}
-                >
-                  {l.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {error && <p className="text-sm text-red-500">{error}</p>}
-
-          <button
-            type="button"
-            onClick={handleStartChat}
-            disabled={isStarting}
-            className="bg-brand-yellow text-gray-900 font-medium py-3 rounded-xl hover:brightness-95 transition disabled:opacity-60"
-          >
-            {isStarting ? "Connecting…" : "Start Chat"}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   // Waiting room
   if (chatState === "waiting") {
     return (
@@ -382,9 +308,81 @@ export function ChatContent({ onClose }: ChatContentProps) {
     );
   }
 
-  // Live chat + closed state
+  // Live chat + closed state (also renders the picker modal overlay)
   return (
-    <div className="flex flex-col h-full bg-gray-100 w-full">
+    <div className="relative flex flex-col h-full bg-gray-100 w-full">
+      {/* Language & category picker modal */}
+      {chatState === "picker" && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl space-y-5">
+            <div className="flex items-center justify-between">
+              <p className="text-base font-medium text-gray-900">Start a Chat</p>
+              <button
+                type="button"
+                onClick={() => (onClose ? onClose() : router.push("/"))}
+                className="text-gray-400 hover:text-gray-700 transition"
+                aria-label="Close"
+              >
+                <X size={18} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">What do you need help with?</p>
+              <div className="flex flex-wrap gap-2">
+                {NEED_CATEGORIES.map((c) => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setNeedCategory(c.value)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl text-sm border transition",
+                      needCategory === c.value
+                        ? "bg-brand-yellow border-brand-yellow text-gray-900 font-medium"
+                        : "border-gray-300 text-gray-700 hover:border-brand-yellow"
+                    )}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Preferred language</p>
+              <div className="flex flex-wrap gap-2">
+                {LANGUAGES.map((l) => (
+                  <button
+                    key={l.value}
+                    type="button"
+                    onClick={() => setLanguage(l.value)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl text-sm border transition",
+                      language === l.value
+                        ? "bg-brand-yellow border-brand-yellow text-gray-900 font-medium"
+                        : "border-gray-300 text-gray-700 hover:border-brand-yellow"
+                    )}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {error && <p className="text-sm text-red-500">{error}</p>}
+
+            <button
+              type="button"
+              onClick={handleStartChat}
+              disabled={isStarting}
+              className="w-full bg-brand-yellow text-gray-900 font-medium py-2.5 rounded-xl hover:brightness-95 transition disabled:opacity-60"
+            >
+              {isStarting ? "Connecting…" : "Start Chat"}
+            </button>
+          </div>
+        </div>
+      )}
+
       <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
         <div className="w-8" />
         <span className="font-medium text-base text-gray-900">StreetLives</span>
