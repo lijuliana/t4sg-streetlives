@@ -5,6 +5,7 @@ import Link from "next/link";
 import moment from "moment";
 import { Home } from "lucide-react";
 import { OverdueFlair } from "@/components/OverdueFlair";
+import { DashboardPoller } from "@/components/DashboardPoller";
 
 interface RealSession {
   id: string;
@@ -16,6 +17,8 @@ interface RealSession {
   closed_at: string | null;
   routing_reason: object | null;
   submitted_for_review: boolean | null;
+  approved: boolean | null;
+  coaching_notes: string | null;
 }
 
 interface NavProfile {
@@ -53,7 +56,7 @@ function SessionRow({ session }: { session: RealSession }) {
           {session.routing_reason && (
             <span className="text-[10px] bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded-full">Routed</span>
           )}
-          {!isClosed && !isUnassigned && <OverdueFlair createdAt={session.created_at} />}
+          {!isClosed && !isUnassigned && <OverdueFlair sessionId={session.id} createdAt={session.created_at} />}
           <span className="text-xs text-gray-400" suppressHydrationWarning>
             {moment(session.created_at).calendar(null, {
               sameDay: "[Today at] h:mm A",
@@ -114,12 +117,16 @@ export default async function NavigatorDashboardPage() {
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
+      <DashboardPoller />
       {/* Header */}
       <header className="bg-white border-b border-gray-200 flex-shrink-0 sticky top-0 z-30">
         <div className="px-4 sm:px-6 lg:px-8 py-3.5 flex items-center gap-3">
           <Link href="/" aria-label="Home" className="p-1 -ml-1 text-gray-500 hover:text-gray-800 transition">
             <Home size={18} />
           </Link>
+          <span className="text-sm text-gray-500">
+            {myProfile?.nav_group ?? session.user.name ?? session.user.email}
+          </span>
           <a href="https://www.google.com" className="ml-auto flex items-center gap-1.5 text-brand-exit text-xs font-medium uppercase tracking-wide">
             Quick Exit <span className="w-5 h-5 rounded-full bg-brand-exit text-white flex items-center justify-center font-bold text-[11px]">!</span>
           </a>
