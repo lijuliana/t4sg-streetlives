@@ -119,6 +119,8 @@ export default function NavigatorChatPage() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         setSendError(err.error ?? "Failed to send");
+      } else {
+        localStorage.setItem(`sl_nav_responded_${sessionId}`, Date.now().toString());
       }
     } catch {
       setSendError("Network error");

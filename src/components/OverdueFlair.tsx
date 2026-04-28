@@ -2,20 +2,24 @@
 
 import { useState, useEffect } from "react";
 
-// 2 minutes for testing — change to 24 * 60 * 60 * 1000 for production
-const THRESHOLD_MS = 2 * 60 * 1000;
+const THRESHOLD_MS = 24 * 60 * 60 * 1000;
 
-export function OverdueFlair({ createdAt }: { createdAt: string }) {
+export function OverdueFlair({ sessionId, createdAt }: { sessionId: string; createdAt: string }) {
   const [isOverdue, setIsOverdue] = useState(false);
 
   useEffect(() => {
     const check = () => {
+      const responded = localStorage.getItem(`sl_nav_responded_${sessionId}`);
+      if (responded) {
+        setIsOverdue(false);
+        return;
+      }
       setIsOverdue(Date.now() - new Date(createdAt).getTime() > THRESHOLD_MS);
     };
     check();
     const interval = setInterval(check, 10_000);
     return () => clearInterval(interval);
-  }, [createdAt]);
+  }, [sessionId, createdAt]);
 
   if (!isOverdue) return null;
 
