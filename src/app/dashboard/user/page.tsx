@@ -72,24 +72,38 @@ export default function UserDashboardPage() {
             </Link>
           </div>
         ) : (
-          <Link
-            href="/chat"
-            className="block bg-white border border-gray-200 rounded-xl px-5 py-4 hover:border-gray-300 hover:shadow-md transition"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-900 capitalize">
-                  {active.need_category.replace(/_/g, " ")}
-                </p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {active.state === "waiting" ? "Waiting for navigator…" : "In progress"}
-                </p>
+          <div className="space-y-2">
+            <Link
+              href="/chat"
+              className="block bg-white border border-gray-200 rounded-xl px-5 py-4 hover:border-gray-300 hover:shadow-md transition"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-900 capitalize">
+                    {active.need_category.replace(/_/g, " ")}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {active.state === "waiting" ? "Waiting for navigator…" : "In progress"}
+                  </p>
+                </div>
+                <span className="text-xs font-medium bg-green-100 text-green-700 px-2.5 py-1 rounded-full">
+                  Continue →
+                </span>
               </div>
-              <span className="text-xs font-medium bg-green-100 text-green-700 px-2.5 py-1 rounded-full">
-                Continue →
-              </span>
-            </div>
-          </Link>
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.removeItem("sl_session_id");
+                localStorage.removeItem("sl_session_token");
+                localStorage.removeItem("sl_session_state");
+                window.location.href = "/chat";
+              }}
+              className="w-full text-xs text-gray-400 hover:text-gray-600 text-center py-1 transition"
+            >
+              Start a new chat instead →
+            </button>
+          </div>
         )}
       </section>
 
