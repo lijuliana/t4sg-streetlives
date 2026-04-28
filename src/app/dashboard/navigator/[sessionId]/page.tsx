@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils";
 const OUTCOME_OPTIONS = [
   "Referrals shared",
   "Information Only",
-  "Follow-Up Needed",
 ];
 
 const POLL_MS = 3000;
@@ -28,6 +27,8 @@ interface Session {
   outcome: string[] | null;
   follow_up_date: string | null;
   submitted_for_review: boolean | null;
+  approved: boolean | null;
+  coaching_notes: string | null;
 }
 
 interface NavProfile {
@@ -42,7 +43,7 @@ interface NavProfile {
 interface SessionEvent {
   id: string;
   session_id: string;
-  event_type: "created" | "assigned" | "transferred" | "closed";
+  event_type: "created" | "assigned" | "transferred" | "closed" | "returned";
   actor_id: string | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
@@ -66,6 +67,7 @@ const EVENT_LABELS: Record<SessionEvent["event_type"], string> = {
   assigned: "Assigned to navigator",
   transferred: "Transferred",
   closed: "Session closed",
+  returned: "Returned to navigator",
 };
 
 function EventIcon({ type }: { type: SessionEvent["event_type"] }) {
@@ -73,6 +75,7 @@ function EventIcon({ type }: { type: SessionEvent["event_type"] }) {
   if (type === "created") return <Circle size={14} className={`${cls} text-gray-400`} />;
   if (type === "assigned") return <UserPlus size={14} className={`${cls} text-blue-400`} />;
   if (type === "transferred") return <ArrowRight size={14} className={`${cls} text-amber-500`} />;
+  if (type === "returned") return <ArrowRight size={14} className={`${cls} text-red-400`} />;
   return <CheckCircle size={14} className={`${cls} text-green-500`} />;
 }
 
@@ -98,22 +101,22 @@ export default function NavigatorSessionDetailPage() {
   const router = useRouter();
 
   const [session, setSession] = useState<Session | null>(null);
-  const [navigators, setNavigators] = useState<NavProfile[]>([]);
   const [events, setEvents] = useState<SessionEvent[]>([]);
   const [myProfile, setMyProfile] = useState<NavProfile | null>(null);
+  const [navigators, setNavigators] = useState<NavProfile[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Transfer
+  const [transferTarget, setTransferTarget] = useState("");
+  const [transferring, setTransferring] = useState(false);
 
   // Notes
   const [notes, setNotes] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
 
-  // Transfer
-  const [transferTarget, setTransferTarget] = useState("");
-
   // Close flow
   const [showClosePanel, setShowClosePanel] = useState(false);
   const [selectedOutcomes, setSelectedOutcomes] = useState<string[]>([]);
-  const [followUpDate, setFollowUpDate] = useState("");
   const [closing, setClosing] = useState(false);
 
   // Chat
@@ -160,17 +163,14 @@ export default function NavigatorSessionDetailPage() {
         navsRes.json(),
         eventsRes.json(),
       ]);
+      const navList: NavProfile[] = Array.isArray(navs) ? navs : [];
       setSession(s);
-      setNavigators(Array.isArray(navs) ? navs : []);
       setEvents(Array.isArray(evts) ? evts : []);
       setNotes(s.notes ?? "");
+      setNavigators(navList);
 
-      // Identify the current user's navigator profile via the session endpoint
-      // (the navigator dashboard already guards this route via middleware)
       if (s.navigator_id) {
-        const mine = (Array.isArray(navs) ? navs : []).find(
-          (n: NavProfile) => n.id === s.navigator_id
-        );
+        const mine = navList.find((n: NavProfile) => n.id === s.navigator_id);
         if (mine) setMyProfile(mine);
       }
       setLoading(false);
@@ -221,42 +221,46 @@ export default function NavigatorSessionDetailPage() {
     }
   };
 
-  const handleTransfer = async (targetId: string) => {
-    const res = await fetch(`/api/sessions/${sessionId}/transfer`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target_navigator_id: targetId }),
-    });
-    if (res.ok) {
-      toast.success("Session transferred");
-      router.push("/dashboard/navigator");
-    } else {
-      const err = await res.json().catch(() => ({}));
-      toast.error(err.error ?? "Transfer failed");
+  const handleTransfer = async () => {
+    if (!transferTarget) return;
+    setTransferring(true);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/transfer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_navigator_id: transferTarget }),
+      });
+      if (res.ok) {
+        toast.success("Session transferred");
+        router.refresh();
+        router.push("/dashboard/navigator");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error ?? "Transfer failed");
+      }
+    } finally {
+      setTransferring(false);
     }
   };
 
   const handleClose = async () => {
     setClosing(true);
     try {
-      // Close the session
       const closeRes = await fetch(`/api/sessions/${sessionId}/close`, { method: "POST" });
       if (!closeRes.ok) {
         toast.error("Failed to close session");
         return;
       }
-      // Save outcome, follow-up date, and submit for review in one PATCH
-      // Notes are already saved separately via the notes field above
       await fetch(`/api/sessions/${sessionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           outcome: selectedOutcomes,
-          follow_up_date: followUpDate || null,
           submitted_for_review: true,
         }),
       });
       toast.success("Session closed and submitted for review");
+      router.refresh();
       router.push("/dashboard/navigator");
     } finally {
       setClosing(false);
@@ -277,6 +281,8 @@ export default function NavigatorSessionDetailPage() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         setSendError(err.error ?? "Failed to send");
+      } else {
+        localStorage.setItem(`sl_nav_responded_${sessionId}`, Date.now().toString());
       }
     } catch {
       setSendError("Network error");
@@ -302,7 +308,6 @@ export default function NavigatorSessionDetailPage() {
 
   const isClosed = session.status === "closed";
   const isMySession = myProfile !== null;
-  const otherNavigators = navigators.filter((n) => n.id !== session.navigator_id && n.status === "available");
   const categoryLabel = session.need_category.replace(/_/g, " ");
 
   return (
@@ -314,7 +319,7 @@ export default function NavigatorSessionDetailPage() {
         </Link>
         <button
           type="button"
-          onClick={() => router.push("/dashboard/navigator")}
+          onClick={() => { router.refresh(); router.push("/dashboard/navigator"); }}
           className="p-1 text-gray-500 hover:text-gray-800 transition"
           aria-label="Back"
         >
@@ -398,31 +403,32 @@ export default function NavigatorSessionDetailPage() {
             </div>
           </div>
 
-          {/* Transfer — active assigned sessions */}
-          {!isClosed && isMySession && otherNavigators.length > 0 && (
-            <div>
-              <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Transfer Session</h2>
-              <div className="flex gap-2">
-                <select
-                  aria-label="Transfer to navigator"
-                  value={transferTarget}
-                  onChange={(e) => setTransferTarget(e.target.value)}
-                  className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
-                >
-                  <option value="" disabled>Select navigator…</option>
-                  {otherNavigators.map((n) => (
-                    <option key={n.id} value={n.id}>{n.nav_group} ({n.languages.join(", ")})</option>
+
+          {/* Transfer */}
+          {!isClosed && (
+            <div className="space-y-2">
+              <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Transfer Session</h2>
+              <select
+                aria-label="Select navigator to transfer to"
+                value={transferTarget}
+                onChange={(e) => setTransferTarget(e.target.value)}
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
+              >
+                <option value="">Select a navigator…</option>
+                {navigators
+                  .filter((n) => n.id !== myProfile?.id)
+                  .map((n) => (
+                    <option key={n.id} value={n.id}>{n.nav_group}</option>
                   ))}
-                </select>
-                <button
-                  type="button"
-                  disabled={!transferTarget}
-                  onClick={() => handleTransfer(transferTarget)}
-                  className="text-sm font-medium px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 transition disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  Transfer
-                </button>
-              </div>
+              </select>
+              <button
+                type="button"
+                onClick={handleTransfer}
+                disabled={!transferTarget || transferring}
+                className="w-full border border-gray-200 text-gray-700 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-50 transition disabled:opacity-40"
+              >
+                {transferring ? "Transferring…" : "Transfer"}
+              </button>
             </div>
           )}
 
@@ -462,17 +468,6 @@ export default function NavigatorSessionDetailPage() {
                     </label>
                   ))}
                 </div>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Follow-up date (optional)</p>
-                <input
-                  type="date"
-                  aria-label="Follow-up date"
-                  value={followUpDate}
-                  onChange={(e) => setFollowUpDate(e.target.value)}
-                  className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow"
-                />
               </div>
 
               <div className="flex gap-2">

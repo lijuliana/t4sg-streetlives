@@ -35,7 +35,7 @@ interface NavProfile {
 
 interface SessionEvent {
   id: string;
-  event_type: "created" | "assigned" | "transferred" | "closed";
+  event_type: "created" | "assigned" | "transferred" | "closed" | "returned";
   actor_id: string | null;
   created_at: string;
 }
@@ -58,6 +58,7 @@ const EVENT_LABELS: Record<SessionEvent["event_type"], string> = {
   assigned: "Assigned to navigator",
   transferred: "Transferred",
   closed: "Session closed",
+  returned: "Returned to navigator",
 };
 
 function EventIcon({ type }: { type: SessionEvent["event_type"] }) {
@@ -65,6 +66,7 @@ function EventIcon({ type }: { type: SessionEvent["event_type"] }) {
   if (type === "created") return <Circle size={14} className={`${cls} text-gray-400`} />;
   if (type === "assigned") return <UserPlus size={14} className={`${cls} text-blue-400`} />;
   if (type === "transferred") return <ArrowRight size={14} className={`${cls} text-amber-500`} />;
+  if (type === "returned") return <ArrowRight size={14} className={`${cls} text-red-400`} />;
   return <CheckCircle size={14} className={`${cls} text-green-500`} />;
 }
 
@@ -98,6 +100,13 @@ export default function SupervisorSessionDetailPage() {
   const [coachingNotes, setCoachingNotes] = useState("");
   const [approving, setApproving] = useState(false);
   const [returning, setReturning] = useState(false);
+
+  // Transfer
+  const [transferTarget, setTransferTarget] = useState("");
+  const [transferring, setTransferring] = useState(false);
+
+  // Return + transfer
+  const [returnTransferTarget, setReturnTransferTarget] = useState("");
 
   // Chat transcript
   const [messages, setMessages] = useState<LocalMessage[]>([]);
@@ -189,6 +198,7 @@ export default function SupervisorSessionDetailPage() {
       });
       if (res.ok) {
         toast.success("Session approved");
+        router.refresh();
         router.push("/dashboard/supervisor");
       } else {
         const err = await res.json().catch(() => ({}));
@@ -196,6 +206,28 @@ export default function SupervisorSessionDetailPage() {
       }
     } finally {
       setApproving(false);
+    }
+  };
+
+  const handleTransfer = async () => {
+    if (!transferTarget) return;
+    setTransferring(true);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/transfer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_navigator_id: transferTarget }),
+      });
+      if (res.ok) {
+        toast.success("Session transferred");
+        router.refresh();
+        router.push("/dashboard/supervisor");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error ?? "Transfer failed");
+      }
+    } finally {
+      setTransferring(false);
     }
   };
 
@@ -209,10 +241,23 @@ export default function SupervisorSessionDetailPage() {
       const res = await fetch(`/api/sessions/${sessionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ submitted_for_review: false, coaching_notes: coachingNotes }),
+        body: JSON.stringify({ submitted_for_review: false, coaching_notes: coachingNotes, status: "active" }),
       });
       if (res.ok) {
+        await fetch(`/api/sessions/${sessionId}/events`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event_type: "returned" }),
+        }).catch(() => {});
+        if (returnTransferTarget) {
+          await fetch(`/api/sessions/${sessionId}/transfer`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ target_navigator_id: returnTransferTarget }),
+          }).catch(() => {});
+        }
         toast.success("Returned to navigator");
+        router.refresh();
         router.push("/dashboard/supervisor");
       } else {
         const err = await res.json().catch(() => ({}));
@@ -241,7 +286,7 @@ export default function SupervisorSessionDetailPage() {
 
   const nav = navigators.find((n) => n.id === session.navigator_id);
   const categoryLabel = session.need_category.replace(/_/g, " ");
-  const isNeedsReview = session.submitted_for_review === true && session.approved !== true;
+  const isNeedsReview = session.status === "closed" && session.approved !== true;
   const isClosed = session.status === "closed";
 
   return (
@@ -253,7 +298,7 @@ export default function SupervisorSessionDetailPage() {
         </Link>
         <button
           type="button"
-          onClick={() => router.push("/dashboard/supervisor")}
+          onClick={() => { router.refresh(); router.push("/dashboard/supervisor"); }}
           className="p-1 text-gray-500 hover:text-gray-800 transition"
           aria-label="Back"
         >
@@ -343,6 +388,34 @@ export default function SupervisorSessionDetailPage() {
             </div>
           </div>
 
+          {/* Transfer */}
+          {!isClosed && (
+            <div className="space-y-2">
+              <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Transfer Session</h2>
+              <select
+                aria-label="Select navigator to transfer to"
+                value={transferTarget}
+                onChange={(e) => setTransferTarget(e.target.value)}
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
+              >
+                <option value="">Select a navigator…</option>
+                {navigators
+                  .filter((n) => n.id !== session.navigator_id)
+                  .map((n) => (
+                    <option key={n.id} value={n.id}>{n.nav_group}</option>
+                  ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleTransfer}
+                disabled={!transferTarget || transferring}
+                className="w-full border border-gray-200 text-gray-700 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-50 transition disabled:opacity-40"
+              >
+                {transferring ? "Transferring…" : "Transfer"}
+              </button>
+            </div>
+          )}
+
           {/* Coaching notes + approve — only for Needs Review sessions */}
           {isNeedsReview && (
             <div className="space-y-3">
@@ -356,6 +429,22 @@ export default function SupervisorSessionDetailPage() {
                   placeholder="Add coaching feedback for the navigator…"
                   className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow placeholder-gray-400 resize-none"
                 />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1.5">Transfer to navigator (optional)</p>
+                <select
+                  aria-label="Transfer to navigator on return"
+                  value={returnTransferTarget}
+                  onChange={(e) => setReturnTransferTarget(e.target.value)}
+                  className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
+                >
+                  <option value="">Keep current navigator</option>
+                  {navigators
+                    .filter((n) => n.id !== session.navigator_id)
+                    .map((n) => (
+                      <option key={n.id} value={n.id}>{n.nav_group}</option>
+                    ))}
+                </select>
               </div>
               <div className="flex gap-2">
                 <button
