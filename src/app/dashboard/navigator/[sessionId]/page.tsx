@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import Link from "next/link";
 import { ArrowLeft, Send, Circle, UserPlus, ArrowRight, CheckCircle, Home } from "lucide-react";
 import moment from "moment";
 import { cn } from "@/lib/utils";
