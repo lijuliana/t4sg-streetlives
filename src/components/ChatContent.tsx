@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Mic, X } from "lucide-react";
 import moment from "moment";
 import { cn } from "@/lib/utils";
-import { createSession, sendMessage, fetchMessages, getSession } from "@/lib/chatApi";
+import { createSession, sendMessage, fetchMessages, getSession, closeSession } from "@/lib/chatApi";
 import type { Message } from "@/lib/chatApi";
 
 type ChatState = "picker" | "waiting" | "live" | "closed";
@@ -79,6 +79,8 @@ export function ChatContent({ onClose }: ChatContentProps) {
   const [inputValue, setInputValue] = useState("");
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [closedByUser, setClosedByUser] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -139,13 +141,22 @@ export function ChatContent({ onClose }: ChatContentProps) {
     fetchMessages(id, token).then(appendMessages).catch(() => {});
     pollRef.current = setInterval(async () => {
       try {
-        const msgs = await fetchMessages(id, token);
+        const [msgs, session] = await Promise.all([
+          fetchMessages(id, token),
+          getSession(id, token),
+        ]);
+        if (session.status === "closed") {
+          stopPolling();
+          setChatState("closed");
+          localStorage.setItem("sl_session_state", "closed");
+          return;
+        }
         appendMessages(msgs);
       } catch {
         // non-fatal, keep polling
       }
     }, POLL_MESSAGES_MS);
-  }, [appendMessages]);
+  }, [appendMessages, stopPolling]);
 
   const startStatusPolling = useCallback((id: string, token: string) => {
     if (statusPollRef.current) return;
@@ -233,20 +244,39 @@ export function ChatContent({ onClose }: ChatContentProps) {
     }
   };
 
-  const handleEndChat = () => {
+  const clearSession = () => {
+    localStorage.removeItem("sl_session_id");
+    localStorage.removeItem("sl_session_token");
+    localStorage.removeItem("sl_session_state");
+    localStorage.removeItem("sl_session_need_category");
+    localStorage.removeItem("sl_session_created_at");
+  };
+
+  const handleLeave = () => {
     stopPolling();
-    if (onClose) {
-      onClose();
-      return;
+    if (sessionId && sessionToken) {
+      closeSession(sessionId, sessionToken).catch(() => {});
     }
+    clearSession();
+    setShowEndConfirm(false);
+    if (onClose) { onClose(); return; }
     router.push("/");
+  };
+
+  const handleEndChat = async () => {
+    stopPolling();
+    if (sessionId && sessionToken) {
+      await closeSession(sessionId, sessionToken).catch(() => {});
+    }
+    clearSession();
+    setClosedByUser(true);
+    setChatState("closed");
+    setShowEndConfirm(false);
   };
 
   const handleStartNewChat = () => {
     stopPolling();
-    localStorage.removeItem("sl_session_id");
-    localStorage.removeItem("sl_session_token");
-    localStorage.removeItem("sl_session_state");
+    clearSession();
     window.location.reload();
   };
 
@@ -288,26 +318,63 @@ export function ChatContent({ onClose }: ChatContentProps) {
       );
     });
 
-  // Category + language picker
-  if (chatState === "picker") {
+  // Waiting room
+  if (chatState === "waiting") {
     return (
       <div className="flex flex-col h-full bg-gray-100 w-full">
         <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
           <div className="w-8" />
           <span className="font-medium text-base text-gray-900">StreetLives</span>
+          <button type="button" onClick={() => setShowEndConfirm(true)} className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 transition">
+            END <X size={18} strokeWidth={2.5} />
+          </button>
+        </header>
+        {showEndConfirm && (
+          <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 flex-shrink-0">
+            <p className="text-sm text-gray-700 flex-1">Leave the queue?</p>
+            <button
+              type="button"
+              onClick={() => setShowEndConfirm(false)}
+              className="text-xs text-gray-500 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleLeave}
+              className="text-xs font-medium text-gray-900 px-3 py-1.5 rounded-lg bg-brand-yellow hover:brightness-95 transition"
+            >
+              Confirm End
+            </button>
+          </div>
+        )}
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
+          <div className="w-12 h-12 rounded-full border-4 border-brand-yellow border-t-transparent animate-spin" />
+          <p className="text-gray-700 font-medium">Looking for an available navigator…</p>
+          <p className="text-sm text-gray-400">This usually takes less than a minute. Please stay on this page.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (chatState === "picker") {
+    return (
+      <div className="flex flex-col h-full bg-white w-full">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
+          <span className="font-medium text-base text-gray-900">StreetLives</span>
           <button
             type="button"
             onClick={() => (onClose ? onClose() : router.push("/"))}
-            className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 transition"
+            className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 transition uppercase tracking-wide"
+            aria-label="Close"
           >
-            CLOSE <X size={18} strokeWidth={2.5} />
+            Close <X size={14} strokeWidth={2.5} />
           </button>
-        </header>
-
-        <div className="flex-1 flex flex-col justify-center px-6 gap-6">
+        </div>
+        <div className="flex-1 overflow-y-auto flex flex-col justify-center px-6 py-8 space-y-8">
           <div>
-            <p className="text-sm font-medium text-gray-700 mb-2">What do you need help with?</p>
-            <div className="flex flex-wrap gap-2">
+            <p className="text-sm font-medium text-gray-700 mb-3">What do you need help with?</p>
+            <div className="flex flex-wrap gap-2.5">
               {NEED_CATEGORIES.map((c) => (
                 <button
                   key={c.value}
@@ -327,8 +394,8 @@ export function ChatContent({ onClose }: ChatContentProps) {
           </div>
 
           <div>
-            <p className="text-sm font-medium text-gray-700 mb-2">Preferred language</p>
-            <div className="flex flex-wrap gap-2">
+            <p className="text-sm font-medium text-gray-700 mb-3">Preferred language</p>
+            <div className="flex flex-wrap gap-2.5">
               {LANGUAGES.map((l) => (
                 <button
                   key={l.value}
@@ -353,7 +420,7 @@ export function ChatContent({ onClose }: ChatContentProps) {
             type="button"
             onClick={handleStartChat}
             disabled={isStarting}
-            className="bg-brand-yellow text-gray-900 font-medium py-3 rounded-xl hover:brightness-95 transition disabled:opacity-60"
+            className="w-full bg-brand-yellow text-gray-900 font-medium py-3.5 rounded-xl hover:brightness-95 transition disabled:opacity-60"
           >
             {isStarting ? "Connecting…" : "Start Chat"}
           </button>
@@ -362,40 +429,45 @@ export function ChatContent({ onClose }: ChatContentProps) {
     );
   }
 
-  // Waiting room
-  if (chatState === "waiting") {
-    return (
-      <div className="flex flex-col h-full bg-gray-100 w-full">
-        <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
-          <div className="w-8" />
-          <span className="font-medium text-base text-gray-900">StreetLives</span>
-          <button type="button" onClick={handleEndChat} className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 transition">
-            LEAVE <X size={18} strokeWidth={2.5} />
-          </button>
-        </header>
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
-          <div className="w-12 h-12 rounded-full border-4 border-brand-yellow border-t-transparent animate-spin" />
-          <p className="text-gray-700 font-medium">Looking for an available navigator…</p>
-          <p className="text-sm text-gray-400">This usually takes less than a minute. Please stay on this page.</p>
-        </div>
-      </div>
-    );
-  }
-
   // Live chat + closed state
   return (
-    <div className="flex flex-col h-full bg-gray-100 w-full">
+    <div className="relative flex flex-col h-full bg-gray-100 w-full">
+
       <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
         <div className="w-8" />
         <span className="font-medium text-base text-gray-900">StreetLives</span>
-        <button type="button" onClick={handleEndChat} className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 transition">
-          CLOSE <X size={18} strokeWidth={2.5} />
-        </button>
+        {chatState === "live" ? (
+          <button type="button" onClick={() => setShowEndConfirm(true)} className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 transition">
+            END <X size={18} strokeWidth={2.5} />
+          </button>
+        ) : (
+          <div className="w-14" />
+        )}
       </header>
+
+      {showEndConfirm && (
+        <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 flex-shrink-0">
+          <p className="text-sm text-gray-700 flex-1">End this chat?</p>
+          <button
+            type="button"
+            onClick={() => setShowEndConfirm(false)}
+            className="text-xs text-gray-500 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleEndChat}
+            className="text-xs font-medium text-gray-900 px-3 py-1.5 rounded-lg bg-brand-yellow hover:brightness-95 transition"
+          >
+            Confirm End
+          </button>
+        </div>
+      )}
 
       <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 flex-shrink-0">
         <p className="text-xs text-gray-400 text-center">
-          {chatState === "closed" ? "This session has ended" : "Connected with a peer navigator"}
+          {chatState === "closed" ? (closedByUser ? "You ended this session" : "This session has ended") : "Connected with a peer navigator"}
         </p>
       </div>
 
@@ -406,7 +478,11 @@ export function ChatContent({ onClose }: ChatContentProps) {
 
       {chatState === "closed" ? (
         <div className="px-4 py-4 bg-white border-t border-gray-200 flex-shrink-0 text-center space-y-2">
-          <p className="text-xs text-gray-500">Your session has been closed by the navigator.</p>
+          <p className="text-xs text-gray-500">
+            {closedByUser
+              ? "You have closed this session."
+              : "Your session has been closed by the navigator."}
+          </p>
           <button
             type="button"
             onClick={handleStartNewChat}

@@ -67,3 +67,14 @@ export async function fetchMessages(
   const data = await res.json();
   return data.messages ?? [];
 }
+
+export async function closeSession(
+  sessionId: string,
+  token: string
+): Promise<void> {
+  await fetch(`/api/sessions/${sessionId}/user-close`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sessionToken: token }),
+  });
+}

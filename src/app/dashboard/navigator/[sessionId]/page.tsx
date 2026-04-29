@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Send, Circle, UserPlus, ArrowRight, CheckCircle } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Send, Circle, UserPlus, ArrowRight, CheckCircle, Home } from "lucide-react";
 import moment from "moment";
 import { cn } from "@/lib/utils";
 import { isProfileComplete } from "@/lib/store";
@@ -13,7 +14,6 @@ import type { NavigatorProfile } from "@/lib/store";
 const OUTCOME_OPTIONS = [
   "Referrals shared",
   "Information Only",
-  "Follow-Up Needed",
 ];
 
 const POLL_MS = 3000;
@@ -30,6 +30,8 @@ interface Session {
   outcome: string[] | null;
   follow_up_date: string | null;
   submitted_for_review: boolean | null;
+  approved: boolean | null;
+  coaching_notes: string | null;
 }
 
 interface NavProfile {
@@ -44,7 +46,7 @@ interface NavProfile {
 interface SessionEvent {
   id: string;
   session_id: string;
-  event_type: "created" | "assigned" | "transferred" | "closed";
+  event_type: "created" | "assigned" | "transferred" | "closed" | "returned";
   actor_id: string | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
@@ -68,6 +70,7 @@ const EVENT_LABELS: Record<SessionEvent["event_type"], string> = {
   assigned: "Assigned to navigator",
   transferred: "Transferred",
   closed: "Session closed",
+  returned: "Returned to navigator",
 };
 
 function EventIcon({ type }: { type: SessionEvent["event_type"] }) {
@@ -75,6 +78,7 @@ function EventIcon({ type }: { type: SessionEvent["event_type"] }) {
   if (type === "created") return <Circle size={14} className={`${cls} text-gray-400`} />;
   if (type === "assigned") return <UserPlus size={14} className={`${cls} text-blue-400`} />;
   if (type === "transferred") return <ArrowRight size={14} className={`${cls} text-amber-500`} />;
+  if (type === "returned") return <ArrowRight size={14} className={`${cls} text-red-400`} />;
   return <CheckCircle size={14} className={`${cls} text-green-500`} />;
 }
 
@@ -100,23 +104,23 @@ export default function NavigatorSessionDetailPage() {
   const router = useRouter();
 
   const [session, setSession] = useState<Session | null>(null);
-  const [navigators, setNavigators] = useState<NavProfile[]>([]);
   const [events, setEvents] = useState<SessionEvent[]>([]);
   const [myProfile, setMyProfile] = useState<NavProfile | null>(null);
+  const [navigators, setNavigators] = useState<NavProfile[]>([]);
   const [myFullProfile, setMyFullProfile] = useState<NavigatorProfile | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Transfer
+  const [transferTarget, setTransferTarget] = useState("");
+  const [transferring, setTransferring] = useState(false);
 
   // Notes
   const [notes, setNotes] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
 
-  // Transfer
-  const [transferTarget, setTransferTarget] = useState("");
-
   // Close flow
   const [showClosePanel, setShowClosePanel] = useState(false);
   const [selectedOutcomes, setSelectedOutcomes] = useState<string[]>([]);
-  const [followUpDate, setFollowUpDate] = useState("");
   const [closing, setClosing] = useState(false);
 
   // Chat
@@ -129,15 +133,16 @@ export default function NavigatorSessionDetailPage() {
   const seenEventIds = useRef<Set<string>>(new Set());
 
   // Resizable split panel
-  const [leftWidth, setLeftWidth] = useState(420);
   const containerRef = useRef<HTMLDivElement>(null);
+  const leftPanelRef = useRef<HTMLDivElement>(null);
   const isSplitDragging = useRef(false);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (!isSplitDragging.current || !containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
-      setLeftWidth(Math.max(260, Math.min(rect.width - 300, e.clientX - rect.left)));
+      const w = Math.max(260, Math.min(rect.width - 300, e.clientX - rect.left));
+      if (leftPanelRef.current) leftPanelRef.current.style.width = `${w}px`;
     };
     const onUp = () => { isSplitDragging.current = false; document.body.style.cursor = ""; };
     document.addEventListener("mousemove", onMove);
@@ -163,10 +168,11 @@ export default function NavigatorSessionDetailPage() {
         navsRes.json(),
         eventsRes.json(),
       ]);
+      const navList: NavProfile[] = Array.isArray(navs) ? navs : [];
       setSession(s);
-      setNavigators(Array.isArray(navs) ? navs : []);
       setEvents(Array.isArray(evts) ? evts : []);
       setNotes(s.notes ?? "");
+      setNavigators(navList);
 
       if (meRes.ok) {
         const fullProfile = (await meRes.json().catch(() => null)) as NavigatorProfile | null;
@@ -174,9 +180,7 @@ export default function NavigatorSessionDetailPage() {
       }
 
       if (s.navigator_id) {
-        const mine = (Array.isArray(navs) ? navs : []).find(
-          (n: NavProfile) => n.id === s.navigator_id
-        );
+        const mine = navList.find((n: NavProfile) => n.id === s.navigator_id);
         if (mine) setMyProfile(mine);
       }
       setLoading(false);
@@ -227,42 +231,46 @@ export default function NavigatorSessionDetailPage() {
     }
   };
 
-  const handleTransfer = async (targetId: string) => {
-    const res = await fetch(`/api/sessions/${sessionId}/transfer`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target_navigator_id: targetId }),
-    });
-    if (res.ok) {
-      toast.success("Session transferred");
-      router.push("/dashboard/navigator");
-    } else {
-      const err = await res.json().catch(() => ({}));
-      toast.error(err.error ?? "Transfer failed");
+  const handleTransfer = async () => {
+    if (!transferTarget) return;
+    setTransferring(true);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/transfer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_navigator_id: transferTarget }),
+      });
+      if (res.ok) {
+        toast.success("Session transferred");
+        router.refresh();
+        router.push("/dashboard/navigator");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error ?? "Transfer failed");
+      }
+    } finally {
+      setTransferring(false);
     }
   };
 
   const handleClose = async () => {
     setClosing(true);
     try {
-      // Close the session
       const closeRes = await fetch(`/api/sessions/${sessionId}/close`, { method: "POST" });
       if (!closeRes.ok) {
         toast.error("Failed to close session");
         return;
       }
-      // Save outcome, follow-up date, and submit for review in one PATCH
-      // Notes are already saved separately via the notes field above
       await fetch(`/api/sessions/${sessionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           outcome: selectedOutcomes,
-          follow_up_date: followUpDate || null,
           submitted_for_review: true,
         }),
       });
       toast.success("Session closed and submitted for review");
+      router.refresh();
       router.push("/dashboard/navigator");
     } finally {
       setClosing(false);
@@ -283,6 +291,8 @@ export default function NavigatorSessionDetailPage() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         setSendError(err.error ?? "Failed to send");
+      } else {
+        localStorage.setItem(`sl_nav_responded_${sessionId}`, Date.now().toString());
       }
     } catch {
       setSendError("Network error");
@@ -316,10 +326,13 @@ export default function NavigatorSessionDetailPage() {
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
       <header className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
+        <Link href="/" aria-label="Home" className="p-1 -ml-1 text-gray-500 hover:text-gray-800 transition">
+          <Home size={18} />
+        </Link>
         <button
           type="button"
-          onClick={() => router.push("/dashboard/navigator")}
-          className="p-1 -ml-1 text-gray-500 hover:text-gray-800 transition"
+          onClick={() => { router.refresh(); router.push("/dashboard/navigator"); }}
+          className="p-1 text-gray-500 hover:text-gray-800 transition"
           aria-label="Back"
         >
           <ArrowLeft size={20} strokeWidth={2} />
@@ -327,7 +340,7 @@ export default function NavigatorSessionDetailPage() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-gray-900 capitalize">{categoryLabel}</p>
           <p className="text-xs text-gray-400">
-            {isClosed ? "Closed" : session.status} · Started {moment(session.created_at).format("MMM D, YYYY")}
+            {isClosed ? "Closed" : "Active"} · Started {moment(session.created_at).format("MMM D, YYYY")}
           </p>
         </div>
         <span className={cn(
@@ -336,14 +349,17 @@ export default function NavigatorSessionDetailPage() {
           session.status === "active" ? "bg-green-100 text-green-700" :
           "bg-amber-100 text-amber-700"
         )}>
-          {isClosed ? "Closed" : session.status}
+          {isClosed ? "Closed" : "Active"}
         </span>
+        <a href="https://www.google.com" className="flex items-center gap-1.5 text-brand-exit text-xs font-medium uppercase tracking-wide">
+          Quick Exit <span className="w-5 h-5 rounded-full bg-brand-exit text-white flex items-center justify-center font-bold text-[11px]">!</span>
+        </a>
       </header>
 
       {/* Split layout */}
       <div ref={containerRef} className="flex flex-1 overflow-hidden">
         {/* Left panel — session details */}
-        <div style={{ width: leftWidth }} className="flex-shrink-0 overflow-y-auto bg-white p-5 space-y-5">
+        <div ref={leftPanelRef} className="w-[420px] flex-shrink-0 overflow-y-auto bg-white p-5 space-y-5">
 
           {/* Session info */}
           <div className="space-y-1 text-sm text-gray-600">
@@ -364,6 +380,7 @@ export default function NavigatorSessionDetailPage() {
           <div>
             <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Session Notes</h2>
             <textarea
+              aria-label="Session notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               onBlur={saveNotes}
@@ -398,31 +415,32 @@ export default function NavigatorSessionDetailPage() {
             </div>
           </div>
 
-          {/* Transfer — active assigned sessions */}
-          {!isClosed && isMySession && otherNavigators.length > 0 && (
-            <div>
-              <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Transfer Session</h2>
-              <div className="flex gap-2">
-                <select
-                  aria-label="Transfer to navigator"
-                  value={transferTarget}
-                  onChange={(e) => setTransferTarget(e.target.value)}
-                  className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
-                >
-                  <option value="" disabled>Select navigator…</option>
-                  {otherNavigators.map((n) => (
-                    <option key={n.id} value={n.id}>{n.nav_group} ({n.languages.join(", ")})</option>
+
+          {/* Transfer */}
+          {!isClosed && (
+            <div className="space-y-2">
+              <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Transfer Session</h2>
+              <select
+                aria-label="Select navigator to transfer to"
+                value={transferTarget}
+                onChange={(e) => setTransferTarget(e.target.value)}
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
+              >
+                <option value="">Select a navigator…</option>
+                {navigators
+                  .filter((n) => n.id !== myProfile?.id)
+                  .map((n) => (
+                    <option key={n.id} value={n.id}>{n.nav_group}</option>
                   ))}
-                </select>
-                <button
-                  type="button"
-                  disabled={!transferTarget}
-                  onClick={() => handleTransfer(transferTarget)}
-                  className="text-sm font-medium px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 transition disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  Transfer
-                </button>
-              </div>
+              </select>
+              <button
+                type="button"
+                onClick={handleTransfer}
+                disabled={!transferTarget || transferring}
+                className="w-full border border-gray-200 text-gray-700 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-50 transition disabled:opacity-40"
+              >
+                {transferring ? "Transferring…" : "Transfer"}
+              </button>
             </div>
           )}
 
@@ -464,16 +482,6 @@ export default function NavigatorSessionDetailPage() {
                 </div>
               </div>
 
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Follow-up date (optional)</p>
-                <input
-                  type="date"
-                  value={followUpDate}
-                  onChange={(e) => setFollowUpDate(e.target.value)}
-                  className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow"
-                />
-              </div>
-
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -509,7 +517,7 @@ export default function NavigatorSessionDetailPage() {
             </p>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+          <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col">
             {messages.length === 0 ? (
               <div className="flex items-center justify-center h-full">
                 <p className="text-sm text-gray-400">No messages yet.</p>
@@ -519,7 +527,7 @@ export default function NavigatorSessionDetailPage() {
                 const ts = moment(msg.timestamp).format("h:mm A");
                 if (msg.role === "navigator") {
                   return (
-                    <div key={msg.id} className="flex flex-col items-end mb-3 max-w-[80%] ml-auto">
+                    <div key={msg.id} className="flex flex-col items-end mb-3 max-w-[80%] self-end">
                       <div className="bg-brand-yellow text-gray-900 text-sm px-4 py-2.5 rounded-2xl rounded-br-sm w-fit">
                         {msg.content}
                       </div>
@@ -530,7 +538,7 @@ export default function NavigatorSessionDetailPage() {
                 const prevMsg = messages[i - 1];
                 const showAvatar = !prevMsg || prevMsg.role !== "user";
                 return (
-                  <div key={msg.id} className={cn("flex gap-3 mb-3 max-w-[80%]", !showAvatar && "pl-11")}>
+                  <div key={msg.id} className="flex gap-3 mb-3 max-w-[80%] self-start">
                     {showAvatar ? <UserAvatar /> : <div className="w-8 flex-shrink-0" />}
                     <div className="flex flex-col">
                       <div className="bg-white text-gray-900 text-sm px-4 py-2.5 rounded-2xl rounded-tl-sm shadow-sm w-fit">
@@ -567,6 +575,7 @@ export default function NavigatorSessionDetailPage() {
               <input
                 ref={inputRef}
                 type="text"
+                aria-label="Reply"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSend()}
