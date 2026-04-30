@@ -40,19 +40,20 @@ export interface Navigator {
 export interface NavigatorProfile {
   id: string;
   auth0_user_id: string;
-  name?: string | null;
+  first_name: string;
+  last_name: string;
   nav_group: string;
   status: "available" | "away" | "offline";
   capacity: number;
   languages: string[];
-  specialties?: ReferralCategory[] | null;
-  availability_days?: string[] | null;
-  availability_start?: string | null;
-  availability_end?: string | null;
+  expertise_tags?: string[] | null;
+  availability_schedule?: Record<string, { start: string; end: string }> | null;
+  is_general_intake?: boolean;
 }
 
 export function profileToNavigator(profile: NavigatorProfile): Navigator {
-  const initials = (profile.name ?? "")
+  const fullName = `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim();
+  const initials = fullName
     .split(" ")
     .filter(Boolean)
     .map((w) => w[0])
@@ -61,9 +62,9 @@ export function profileToNavigator(profile: NavigatorProfile): Navigator {
     .toUpperCase();
   return {
     id: profile.id,
-    name: profile.name ?? "",
+    name: fullName,
     avatarInitials: initials || "NA",
-    specialties: profile.specialties ?? [],
+    specialties: (profile.expertise_tags as ReferralCategory[]) ?? [],
     capacity: profile.capacity,
     available: profile.status === "available",
   };
@@ -71,9 +72,10 @@ export function profileToNavigator(profile: NavigatorProfile): Navigator {
 
 export function isProfileComplete(profile: NavigatorProfile): boolean {
   return (
-    (profile.name?.trim() ?? "").length > 0 &&
+    (profile.first_name?.trim() ?? "").length > 0 &&
+    (profile.last_name?.trim() ?? "").length > 0 &&
     (profile.languages?.length ?? 0) > 0 &&
-    (profile.specialties?.length ?? 0) > 0 &&
+    (profile.expertise_tags?.length ?? 0) > 0 &&
     (profile.nav_group?.trim() ?? "").length > 0
   );
 }

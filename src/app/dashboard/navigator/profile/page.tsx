@@ -14,27 +14,30 @@ export default async function NavigatorProfilePage() {
 
   let profile: NavigatorProfile | null = null;
   try {
-    const res = await lambdaFetch("/navigators/me");
-    if (res.ok) {
-      profile = (await res.json()) as NavigatorProfile;
+    const allRes = await lambdaFetch("/navigators");
+    if (allRes.ok) {
+      const all = await allRes.json().catch(() => []);
+      const list: NavigatorProfile[] = Array.isArray(all) ? all : (all.navigators ?? []);
+      profile = list.find((n) => n.auth0_user_id === session.user.sub) ?? null;
     }
   } catch {
-    // No profile exists yet — form will POST to create one.
+    // No profile exists yet — form will create one.
   }
 
   const isNew = profile === null;
 
   return (
     <DashboardShell
-      title={isNew ? "Complete Your Profile" : "Edit Profile"}
+      title={isNew ? "Set Up Your Profile" : "Edit Profile"}
       role="navigator"
-      backHref="/dashboard/navigator"
+      backHref={isNew ? undefined : "/dashboard/navigator"}
     >
       {isNew && (
         <div className="bg-amber-50 border border-amber-200 rounded-md px-4 py-3 mb-5">
+          <p className="text-sm text-amber-700 font-medium mb-0.5">Welcome to StreetLives</p>
           <p className="text-sm text-amber-700">
-            Set up your profile so the routing system can match you to sessions
-            that fit your languages and expertise.
+            Complete your profile before you can receive sessions. This helps the routing
+            system match you to the people seeking help.
           </p>
         </div>
       )}

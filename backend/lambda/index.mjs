@@ -569,7 +569,7 @@ async function getNavigator(id) {
 
 // PATCH /navigators/:id
 async function updateNavigator(id, body) {
-  const fields = ["nav_group","expertise_tags","languages","capacity","status","is_general_intake"];
+  const fields = ["nav_group","expertise_tags","languages","capacity","status","is_general_intake","first_name","last_name"];
   const updates = [];
   const values = [];
   let i = 1;
@@ -578,6 +578,10 @@ async function updateNavigator(id, body) {
       updates.push(`${f}=$${i++}`);
       values.push(body[f]);
     }
+  }
+  if (body.availability_schedule !== undefined) {
+    updates.push(`availability_schedule=$${i++}::jsonb`);
+    values.push(JSON.stringify(body.availability_schedule));
   }
   if (updates.length === 0) return respond(400, { error: "No fields to update" });
   updates.push(`updated_at=NOW()`);

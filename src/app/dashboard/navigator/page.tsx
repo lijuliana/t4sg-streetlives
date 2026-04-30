@@ -6,10 +6,6 @@ import moment from "moment";
 import { Home } from "lucide-react";
 import { OverdueFlair } from "@/components/OverdueFlair";
 import { DashboardPoller } from "@/components/DashboardPoller";
-import DashboardShell from "@/components/DashboardShell";
-import SessionStatusBadge from "@/components/SessionStatusBadge";
-import { isProfileComplete } from "@/lib/store";
-import type { NavigatorProfile } from "@/lib/store";
 
 interface RealSession {
   id: string;
@@ -28,14 +24,13 @@ interface RealSession {
 interface NavProfile {
   id: string;
   auth0_user_id: string;
+  first_name: string;
+  last_name: string;
   nav_group: string;
   status: string;
   capacity: number;
-function mapStatus(s: string): "queued" | "active" | "closed" {
-  if (s === "unassigned") return "queued";
-  if (s === "closed") return "closed";
-  return "active";
 }
+
 
 function SessionRow({ session }: { session: RealSession }) {
   const isUnassigned = session.navigator_id === null;
@@ -96,20 +91,22 @@ export default async function NavigatorDashboardPage() {
   const session = await auth0.getSession();
   if (!session) redirect("/auth/login");
 
-  const [sessionsRes, navsRes, meRes] = await Promise.all([
+  const [sessionsRes, navsRes] = await Promise.all([
     lambdaFetch("/sessions"),
     lambdaFetch("/navigators"),
-    lambdaFetch("/navigators/me"),
   ]);
 
+  const navsBody = navsRes.ok ? await navsRes.json().catch(() => []) : [];
+  const navList: NavProfile[] = Array.isArray(navsBody) ? navsBody : (navsBody.navigators ?? []);
+  const myProfile = navList.find((n) => n.auth0_user_id === session.user.sub) ?? null;
+
   // No profile yet — require setup before anything else
-  if (!meRes.ok) redirect("/dashboard/navigator/profile");
+  if (!myProfile) redirect("/dashboard/navigator/profile");
+
+  const sessionsBody = sessionsRes.ok ? await sessionsRes.json().catch(() => null) : null;
 
   const allSessions: RealSession[] = sessionsRes.ok
     ? Array.isArray(sessionsBody) ? sessionsBody : (sessionsBody.sessions ?? [])
-    : [];
-  const navigators: NavProfile[] = navsRes.ok
-    ? Array.isArray(navsBody) ? navsBody : (navsBody.navigators ?? [])
     : [];
 
   const byRecent = (a: RealSession, b: RealSession) =>
@@ -120,14 +117,9 @@ export default async function NavigatorDashboardPage() {
   const active = mySessions.filter((s) => s.status !== "closed").sort(byRecent);
   const closed = mySessions.filter((s) => s.status === "closed").sort(byRecent);
 
-  const editProfileAction = (
-    <Link
-      href="/dashboard/navigator/profile"
-      className="text-xs font-medium text-gray-500 hover:text-gray-800 transition"
-    >
-      Edit profile
-    </Link>
-  );
+  const displayName = myProfile?.first_name
+    ? `${myProfile.first_name} ${myProfile.last_name}`.trim()
+    : session.user.email;
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
@@ -138,9 +130,10 @@ export default async function NavigatorDashboardPage() {
           <Link href="/" aria-label="Home" className="p-1 -ml-1 text-gray-500 hover:text-gray-800 transition">
             <Home size={18} />
           </Link>
-          <span className="text-sm text-gray-500">
-            {myProfile?.nav_group ?? session.user.name ?? session.user.email}
-          </span>
+          <span className="text-sm text-gray-500">{displayName}</span>
+          <Link href="/dashboard/navigator/profile" className="text-xs font-medium text-gray-500 hover:text-gray-800 transition ml-2">
+            Edit profile
+          </Link>
           <a href="https://www.google.com" className="ml-auto flex items-center gap-1.5 text-brand-exit text-xs font-medium uppercase tracking-wide">
             Quick Exit <span className="w-5 h-5 rounded-full bg-brand-exit text-white flex items-center justify-center font-bold text-[11px]">!</span>
           </a>

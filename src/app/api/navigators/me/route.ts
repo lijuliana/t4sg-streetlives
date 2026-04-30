@@ -1,64 +1,51 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth0 } from "@/lib/auth0";
 import { lambdaFetch } from "@/lib/lambda";
 
 export async function GET() {
-  const res = await lambdaFetch("/navigators/me");
-  const data = await res.json().catch(() => null);
-  return NextResponse.json(data, { status: res.status });
+  const session = await auth0.getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const allRes = await lambdaFetch("/navigators");
+  if (!allRes.ok) return NextResponse.json({ error: "Failed to fetch navigators" }, { status: allRes.status });
+
+  const all = await allRes.json().catch(() => []);
+  const list = Array.isArray(all) ? all : (all.navigators ?? []);
+  const me = list.find((n: { auth0_user_id?: string }) => n.auth0_user_id === session.user.sub) ?? null;
+
+  if (!me) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json(me);
 }
 
 // Upsert the current navigator's profile.
-//
-// The Lambda uses PATCH /navigators/:id for updates (not PUT).
-// GET /navigators/me returns 404 for incomplete profiles, so we fall back to
-// scanning GET /navigators (all) to find the row by userId / auth0_user_id,
-// then PATCH it. If no row exists at all, POST /navigators creates one.
+// Finds the row by auth0_user_id from the session, PATCHes if found, POSTs if not.
 export async function PUT(req: NextRequest) {
+  const session = await auth0.getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const body = await req.json();
 
-  // Step 1: GET /navigators/me — works for complete profiles.
-  const meRes = await lambdaFetch("/navigators/me");
-  if (meRes.ok) {
-    const me = await meRes.json().catch(() => null) as { id?: string } | null;
-    if (me?.id) {
-      const patchRes = await lambdaFetch(`/navigators/${me.id}`, {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      });
-      return NextResponse.json(await patchRes.json().catch(() => null), { status: patchRes.status });
-    }
-  }
-
-  // Step 2: GET /navigators/me returned 404 (incomplete profile).
-  // Scan the full list and match on userId or auth0_user_id from the request body.
-  const auth0UserId: string | undefined = body.auth0_user_id ?? body.userId;
-  if (auth0UserId) {
-    const allRes = await lambdaFetch("/navigators");
-    if (allRes.ok) {
-      const all = await allRes.json().catch(() => []) as Array<{
-        id: string;
-        userId?: string;
-        auth0_user_id?: string;
-      }>;
-      if (Array.isArray(all)) {
-        const existing = all.find(
-          (n) => n.userId === auth0UserId || n.auth0_user_id === auth0UserId
-        );
-        if (existing?.id) {
-          const patchRes = await lambdaFetch(`/navigators/${existing.id}`, {
-            method: "PATCH",
-            body: JSON.stringify(body),
-          });
-          return NextResponse.json(await patchRes.json().catch(() => null), { status: patchRes.status });
-        }
+  const allRes = await lambdaFetch("/navigators");
+  if (allRes.ok) {
+    const all = await allRes.json().catch(() => []) as Array<{ id: string; auth0_user_id?: string }>;
+    if (Array.isArray(all)) {
+      const existing = all.find((n) => n.auth0_user_id === session.user.sub);
+      if (existing?.id) {
+        const patchRes = await lambdaFetch(`/navigators/${existing.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(body),
+        });
+        const patchBody = await patchRes.json().catch(() => null);
+        return NextResponse.json(patchBody, { status: patchRes.status });
       }
     }
   }
 
-  // Step 3: No existing row found — create a new profile.
+  // No existing row — create a new profile.
   const createRes = await lambdaFetch("/navigators", {
     method: "POST",
     body: JSON.stringify(body),
   });
-  return NextResponse.json(await createRes.json().catch(() => null), { status: createRes.status });
+  const createBody = await createRes.json().catch(() => null);
+  return NextResponse.json(createBody, { status: createRes.status });
 }

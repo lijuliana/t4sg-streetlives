@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import Link from "next/link";
 import { ArrowLeft, Send, Circle, UserPlus, ArrowRight, CheckCircle, Home } from "lucide-react";
 import moment from "moment";
 import { cn } from "@/lib/utils";
@@ -37,10 +36,22 @@ interface Session {
 interface NavProfile {
   id: string;
   auth0_user_id: string;
+  first_name: string;
+  last_name: string;
   nav_group: string;
   status: string;
   capacity: number;
   languages: string[];
+}
+
+function navFullName(n: NavProfile): string {
+  return `${n.first_name ?? ""} ${n.last_name ?? ""}`.trim() || n.nav_group || n.auth0_user_id;
+}
+
+function resolveActorName(actorId: string, navList: NavProfile[]): string {
+  if (actorId === "system") return "System";
+  const nav = navList.find((n) => n.auth0_user_id === actorId || n.id === actorId);
+  return nav ? navFullName(nav) : "Supervisor";
 }
 
 interface SessionEvent {
@@ -169,7 +180,7 @@ export default function NavigatorSessionDetailPage() {
         eventsRes.json(),
       ]);
       const navList: NavProfile[] = Array.isArray(navs) ? navs : [];
-      setSession(s);
+setSession(s);
       setEvents(Array.isArray(evts) ? evts : []);
       setNotes(s.notes ?? "");
       setNavigators(navList);
@@ -319,8 +330,7 @@ export default function NavigatorSessionDetailPage() {
   const isClosed = session.status === "closed";
   const isMySession = myProfile !== null;
   const profileComplete = myFullProfile ? isProfileComplete(myFullProfile) : true;
-  const otherNavigators = navigators.filter((n) => n.id !== session.navigator_id && n.status === "available");
-  const categoryLabel = session.need_category.replace(/_/g, " ");
+const categoryLabel = session.need_category.replace(/_/g, " ");
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -370,7 +380,7 @@ export default function NavigatorSessionDetailPage() {
               <p><span className="text-gray-400">Closed:</span> {moment(session.closed_at).format("MMM D, YYYY [at] h:mm A")}</p>
             )}
             {session.navigator_id ? (
-              <p><span className="text-gray-400">Navigator:</span> {myProfile?.nav_group ?? session.navigator_id}</p>
+              <p><span className="text-gray-400">Navigator:</span> {myProfile ? navFullName(myProfile) : session.navigator_id}</p>
             ) : (
               <p className="text-amber-500">Unassigned</p>
             )}
@@ -406,7 +416,7 @@ export default function NavigatorSessionDetailPage() {
                       <p className="text-sm text-gray-700">{EVENT_LABELS[event.event_type]}</p>
                       <p className="text-xs text-gray-400 mt-0.5">
                         {moment(event.created_at).format("MMM D [at] h:mm A")}
-                        {event.actor_id ? ` · ${event.actor_id}` : ""}
+                        {event.actor_id ? ` · ${resolveActorName(event.actor_id, navigators)}` : ""}
                       </p>
                     </div>
                   </div>
@@ -430,7 +440,7 @@ export default function NavigatorSessionDetailPage() {
                 {navigators
                   .filter((n) => n.id !== myProfile?.id)
                   .map((n) => (
-                    <option key={n.id} value={n.id}>{n.nav_group}</option>
+                    <option key={n.id} value={n.id}>{navFullName(n)}</option>
                   ))}
               </select>
               <button
