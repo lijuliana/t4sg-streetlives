@@ -6,15 +6,20 @@ export type SessionStatus = "unassigned" | "active" | "closed" | "transferred";
 export type NavGroup = "CUNY_PIN" | "HOUSING_WORKS" | "DYCD";
 export type NavigatorStatus = "available" | "away" | "offline";
 
+export type AvailabilitySchedule = Record<string, { start: string; end: string }>;
+
 export interface NavigatorProfile {
   id: string;
   userId: string;             // Matrix user ID, e.g. @alice:homeserver.org
+  firstName?: string;
+  lastName?: string;
   navGroup: NavGroup;         // Stored for future routing use; not a hard filter right now
   expertiseTags: string[];
   languages: string[];        // ISO 639-1 codes, lowercase
   capacity: number;           // max concurrent active sessions
   status: NavigatorStatus;
   isGeneralIntake: boolean;   // if true, eligible for initial session assignment
+  availabilitySchedule?: AvailabilitySchedule; // keyed by "Mon"–"Sun"
   createdAt: string;          // ISO 8601
   updatedAt: string;          // ISO 8601
 }
@@ -40,15 +45,12 @@ export interface RoutingInput {
   language?: string;
 }
 
-/**
- * Explainability payload included in successful assignments.
- * need_category is retained in sessions for analytics but does not constrain
- * routing in v2 — all navigators are treated as cross-trained.
- */
+/** Explainability payload included in successful assignments. */
 export interface RoutingReason {
   generalIntakeOnly: boolean;     // true for initial assignment, false for transfer
   languageRequested: string | null;
-  languageMatch: boolean;
+  languageMatch: boolean;         // true when language was requested and matched
+  needCategoryMatch: boolean;     // true when needCategory was specific (not "other") and matched
   loadRatio: number;              // active / capacity at assignment time
   score: number;                  // deterministic sort key (lower loadRatio = higher score)
 }
@@ -156,21 +158,27 @@ export interface CreateReferralRequest {
 
 export interface CreateNavigatorProfileRequest {
   userId: string;
+  firstName?: string;
+  lastName?: string;
   navGroup: NavGroup;
   expertiseTags?: string[];
   languages?: string[];
   capacity?: number;
   status?: NavigatorStatus;
   isGeneralIntake?: boolean;
+  availabilitySchedule?: AvailabilitySchedule;
 }
 
 export interface UpdateNavigatorProfileRequest {
+  firstName?: string;
+  lastName?: string;
   navGroup?: NavGroup;
   expertiseTags?: string[];
   languages?: string[];
   capacity?: number;
   status?: NavigatorStatus;
   isGeneralIntake?: boolean;
+  availabilitySchedule?: AvailabilitySchedule;
 }
 
 export interface AssignRoutingRequest {

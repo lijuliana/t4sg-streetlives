@@ -18,3 +18,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ sessio
   const data = await res.json();
   return NextResponse.json(data, { status: res.status });
 }
+
+export async function DELETE(_req: Request, { params }: { params: Promise<{ sessionId: string }> }) {
+  const { sessionId } = await params;
+  const res = await lambdaFetch(`/sessions/${sessionId}`, { method: "DELETE" });
+  const data = await res.json();
+  return NextResponse.json(data, { status: res.status });
+}

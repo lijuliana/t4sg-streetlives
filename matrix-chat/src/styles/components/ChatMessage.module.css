@@ -91,6 +91,11 @@
   color: #1e293b;
 }
 
+/* ── Pending state ── */
+.messageWrapper[data-pending="true"] {
+  opacity: 0.55;
+}
+
 /* ── Timestamp ── */
 .timestamp {
   font-size: 10px;

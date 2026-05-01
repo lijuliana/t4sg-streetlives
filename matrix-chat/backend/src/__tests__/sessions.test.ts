@@ -3,7 +3,7 @@
  *
  * Tests exercise the routing service and store logic directly without HTTP.
  * Covers session creation status derivation, transfer guards, and routing
- * behaviour under the v2 model (language-first, general-intake gate).
+ * behaviour under the v4 model (specialist-first, language preserved in fallback).
  */
 
 import { describe, it, expect } from "vitest";
@@ -37,13 +37,13 @@ describe("session creation status", () => {
     expect(status).toBe("active");
   });
 
-  it("session becomes unassigned when no general-intake navigator is available", () => {
-    // All navigators are non-intake; initial routing should return unassigned
+  it("session becomes active even when navigator has isGeneralIntake=false (gate removed)", () => {
+    // isGeneralIntake no longer restricts routing; any available navigator is eligible
     const navs = [makeNav({ isGeneralIntake: false, status: "available" })];
     const outcome = assignNavigator({ needCategory: "housing" }, navs, noLoad, "initial");
-    expect(outcome.assigned).toBe(false);
+    expect(outcome.assigned).toBe(true);
     const status = outcome.assigned ? "active" : "unassigned";
-    expect(status).toBe("unassigned");
+    expect(status).toBe("active");
   });
 
   it("session becomes unassigned when language is unmatched", () => {

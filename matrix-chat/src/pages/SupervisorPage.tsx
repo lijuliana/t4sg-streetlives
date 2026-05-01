@@ -5,6 +5,8 @@ import styles from "../styles/pages/SupervisorPage.module.css";
 
 type SessionStatus = "unassigned" | "active" | "closed" | "transferred";
 type EventType = "created" | "assigned" | "transferred" | "closed";
+type NavStatus = "available" | "away" | "offline";
+type AvailabilitySchedule = Record<string, { start: string; end: string }>;
 
 interface SessionEvent {
   id: string;
@@ -22,6 +24,16 @@ interface DashSession {
   closedAt: string | null;
   needCategory: string | null;
   assignedNavigatorId: string | null;
+}
+
+interface Navigator {
+  id: string;
+  userId: string;
+  firstName?: string;
+  lastName?: string;
+  navGroup: string;
+  status: NavStatus;
+  availabilitySchedule?: AvailabilitySchedule;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -42,12 +54,29 @@ async function apiFetch<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+const DAY_KEYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+function isInScheduledHours(schedule: AvailabilitySchedule | undefined): boolean {
+  if (!schedule) return false;
+  const now = new Date();
+  const slot = schedule[DAY_KEYS[now.getDay()]];
+  if (!slot) return false;
+  const toMins = (t: string) => {
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  };
+  const cur = now.getHours() * 60 + now.getMinutes();
+  return cur >= toMins(slot.start) && cur < toMins(slot.end);
+}
+
 // ── Supervisor Page ───────────────────────────────────────────────────────────
 
 const SupervisorPage: React.FC = () => {
   const [events, setEvents] = useState<SessionEvent[]>([]);
   const [sessions, setSessions] = useState<DashSession[]>([]);
+  const [navigators, setNavigators] = useState<Navigator[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingNavs, setLoadingNavs] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<EventType | "all">("all");
 
@@ -68,14 +97,29 @@ const SupervisorPage: React.FC = () => {
     }
   };
 
+  const loadNavigators = async () => {
+    try {
+      const data = await apiFetch<Navigator[]>("/api/navigators");
+      setNavigators(data);
+    } catch {
+      // non-fatal — navigator strip just stays empty
+    } finally {
+      setLoadingNavs(false);
+    }
+  };
+
   useEffect(() => {
-    load();
-    const interval = setInterval(load, 15_000);
+    void load();
+    void loadNavigators();
+    const interval = setInterval(() => {
+      void load();
+      void loadNavigators();
+    }, 15_000);
     return () => clearInterval(interval);
   }, []);
 
   const sessionMap = new Map(sessions.map((s) => [s.sessionId, s]));
-
+  const navById = new Map(navigators.map((n) => [n.id, n]));
   const filtered = filter === "all" ? events : events.filter((e) => e.eventType === filter);
 
   return (
@@ -94,7 +138,7 @@ const SupervisorPage: React.FC = () => {
           </div>
           <button
             type="button"
-            onClick={load}
+            onClick={() => { void load(); void loadNavigators(); }}
             className={styles.headerRefreshButton}
           >
             ↻ Refresh
@@ -108,25 +152,50 @@ const SupervisorPage: React.FC = () => {
       <div className={styles.content}>
         {/* Session summary strip */}
         <div className={styles.sessionStrip}>
-          {sessions.map((s) => (
-            <div key={s.sessionId} className={styles.sessionCard}>
-              <div className={styles.sessionCardId}>
-                #{s.sessionId.slice(0, 8)}
-              </div>
-              <span
-                className={styles.sessionCardPill}
-                data-status={s.status}
-              >
-                {s.status}
-              </span>
-              {s.needCategory && (
-                <div className={styles.sessionCardCategory}>
-                  {s.needCategory}
+          {sessions.map((s) => {
+            const nav = s.assignedNavigatorId ? navById.get(s.assignedNavigatorId) : undefined;
+            const navName = nav
+              ? (nav.firstName || nav.lastName
+                  ? `${nav.firstName ?? ""} ${nav.lastName ?? ""}`.trim()
+                  : nav.userId.replace(/@|:.*$/g, ""))
+              : null;
+            const inHours = nav ? isInScheduledHours(nav.availabilitySchedule) : false;
+
+            return (
+              <div key={s.sessionId} className={styles.sessionCard}>
+                <div className={styles.sessionCardId}>
+                  #{s.sessionId.slice(0, 8)}
                 </div>
-              )}
-              <div className={styles.sessionCardDate}>{fmt(s.createdAt)}</div>
-            </div>
-          ))}
+                <span className={styles.sessionCardPill} data-status={s.status}>
+                  {s.status}
+                </span>
+                {navName && (
+                  <div className={styles.sessionCardNavRow}>
+                    <span
+                      className={styles.navDot}
+                      data-status={nav!.status}
+                      aria-label={nav!.status}
+                    />
+                    <span className={styles.sessionCardNavName}>{navName}</span>
+                  </div>
+                )}
+                {s.needCategory && (
+                  <div className={styles.sessionCardCategory}>
+                    {s.needCategory}
+                  </div>
+                )}
+                {nav?.availabilitySchedule && (
+                  <span
+                    className={styles.navAvailBadge}
+                    data-in-hours={String(inHours)}
+                  >
+                    {inHours ? "In hours" : "Out of hours"}
+                  </span>
+                )}
+                <div className={styles.sessionCardDate}>{fmt(s.createdAt)}</div>
+              </div>
+            );
+          })}
           {!loading && sessions.length === 0 && (
             <p className={styles.noSessions}>No sessions yet.</p>
           )}
@@ -154,7 +223,6 @@ const SupervisorPage: React.FC = () => {
 
         {/* Events table */}
         <div className={styles.eventsTable}>
-          {/* Table header */}
           <div className={styles.tableHeader}>
             <span>Session</span>
             <span>Event</span>
@@ -191,7 +259,6 @@ const SupervisorPage: React.FC = () => {
                 className={styles.eventTableRow}
                 data-event-type={ev.eventType}
               >
-                {/* Session ID */}
                 <div>
                   <span className={styles.cellSessionId}>
                     #{ev.sessionId.slice(0, 8)}
@@ -200,27 +267,19 @@ const SupervisorPage: React.FC = () => {
                     <div className={styles.cellSessionStatus}>{sess.status}</div>
                   )}
                 </div>
-
-                {/* Event type */}
                 <span
                   className={styles.cellEventType}
                   data-event-type={ev.eventType}
                 >
                   {ev.eventType}
                 </span>
-
-                {/* Time */}
                 <span className={styles.cellTime}>{fmt(ev.timestamp)}</span>
-
-                {/* Metadata */}
                 <span
                   className={styles.cellMeta}
                   title={JSON.stringify(ev.metadata, null, 2)}
                 >
                   {metaSummary}
                 </span>
-
-                {/* Actor */}
                 <span
                   className={styles.cellActor}
                   data-has-actor={String(!!ev.actor)}

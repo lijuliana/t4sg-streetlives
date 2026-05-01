@@ -26,6 +26,7 @@ interface LocalMessage {
   role: "user" | "navigator";
   content: string;
   timestamp: string;
+  pending?: boolean;
 }
 
 function parseMessage(body: string): { sender: string; text: string } {
@@ -110,6 +111,13 @@ export default function NavigatorChatPage() {
     if (!text || isReadOnly) return;
     setInputValue("");
     setSendError(null);
+
+    const pendingId = `pending-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      { id: pendingId, role: "navigator", content: text, timestamp: new Date().toISOString(), pending: true },
+    ]);
+
     try {
       const res = await fetch(`/api/sessions/${sessionId}/navigator-messages`, {
         method: "POST",
@@ -125,6 +133,9 @@ export default function NavigatorChatPage() {
     } catch {
       setSendError("Network error");
     }
+
+    // Remove the optimistic copy — the confirmed message arrives on the next poll.
+    setMessages((prev) => prev.filter((m) => m.id !== pendingId));
     setTimeout(() => inputRef.current?.focus(), 50);
   };
 
@@ -155,11 +166,11 @@ export default function NavigatorChatPage() {
 
       if (msg.role === "navigator") {
         return (
-          <div key={msg.id} className="flex flex-col items-end mb-3 max-w-[80%] ml-auto">
+          <div key={msg.id} className={cn("flex flex-col items-end mb-3 max-w-[80%] ml-auto", msg.pending && "opacity-50")}>
             <div className="bg-brand-yellow text-gray-900 text-sm px-4 py-2.5 rounded-2xl rounded-br-sm w-fit">
               {msg.content}
             </div>
-            <span className="text-[10px] text-gray-400 mt-1 mr-1">{ts}</span>
+            <span className="text-[10px] text-gray-400 mt-1 mr-1">{msg.pending ? "Sending…" : ts}</span>
           </div>
         );
       }

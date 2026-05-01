@@ -168,18 +168,29 @@ const NavigatorChatPage: React.FC<NavigatorChatPageProps> = ({
   // ── Send message ──────────────────────────────────────────────────────────
   const handleSend = async (text: string) => {
     setSendError(null);
+
+    const pendingId = `pending-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      { eventId: pendingId, sender: myUserId, body: text, timestamp: Date.now(), pending: true },
+    ]);
+
     try {
       const client = await getMatrixClient();
       await client.sendTextMessage(roomId, text);
     } catch (err) {
+      setMessages((prev) => prev.filter((m) => m.eventId !== pendingId));
       if (err instanceof MatrixAuthError) {
         setUiState("auth-error");
         onAuthError?.();
         return;
       }
       setSendError("Failed to send message. Please try again.");
-      console.error("[NavigatorChat] Send error:", err);
+      return;
     }
+
+    // Real event arrives via the timeline listener; remove the optimistic copy.
+    setMessages((prev) => prev.filter((m) => m.eventId !== pendingId));
   };
 
   // ── Render helpers ────────────────────────────────────────────────────────

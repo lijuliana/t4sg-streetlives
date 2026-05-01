@@ -1,63 +1,62 @@
 /**
- * Routing service — v2 language-first, general-intake model.
+ * Routing service — tiered specialization + language + capacity.
  *
- * Design principles:
- *   - All navigators are assumed cross-trained on all need categories.
- *   - need_category is retained for analytics and future routing versions
- *     but does NOT constrain eligibility now.
- *   - Language compatibility is the primary routing signal.
- *   - is_general_intake gates initial assignment; transfer can reach any navigator.
+ * Algorithm (applies to both initial assignment and re-routing):
+ *   1. Filter to status="available" and capacity > 0.
+ *   2. Exclude navigators at or above capacity (active load >= capacity).
+ *   3. If none remain → queue (assigned: false).
+ *   4. PRIMARY: find specialists — category match (unless "other") + language match (if specified).
+ *      If any found → sort by load ratio (asc), assign top candidate.
+ *   5. FALLBACK: no specialists available → any navigator below capacity, language preserved.
+ *      If any found → sort by load ratio (asc), assign top candidate.
+ *   6. If fallback empty → queue (language cannot be served by any available navigator).
  *
- * Algorithm (initial assignment):
- *   1. Exclude navigators whose status is "away" or "offline".
- *   2. Restrict to navigators with is_general_intake = true.
- *   3. If a language is requested, hard-reject if no candidate speaks it.
- *   4. Among eligible candidates, sort by ascending load ratio (active / capacity),
- *      with navigator ID as a stable tie-breaker.
- *   5. Return the top candidate.
- *
- * Algorithm (transfer):
- *   Same as above but step 2 is skipped — any available navigator is eligible.
- *   Language hard-reject still applies when a language is requested.
- *
- * Returns a discriminated RoutingOutcome so callers never silently swallow
- * the "no match" case without capturing the reason.
+ * Load balancing (all tiers): sort by activeLoad / capacity (ascending); id as stable tie-breaker.
+ * Navigators with a lower active:capacity ratio always receive new users over busier ones.
  */
 
 import type {
   NavigatorProfile,
-  NeedCategory,
   RoutingInput,
   RoutingMode,
   RoutingOutcome,
   RoutingReason,
 } from "../types.js";
 
-export const ROUTING_VERSION = "v2_language_first_general_intake";
+export const ROUTING_VERSION = "v4_tiered_category_lang_capacity";
 
 function buildReason(
-  generalIntakeOnly: boolean,
   languageRequested: string | null,
   languageMatch: boolean,
+  needCategoryMatch: boolean,
   loadRatio: number,
 ): RoutingReason {
   return {
-    generalIntakeOnly,
+    generalIntakeOnly: false,
     languageRequested,
     languageMatch,
+    needCategoryMatch,
     loadRatio,
-    // score = negative load ratio so callers can reason about it as "higher is better"
     score: -loadRatio,
   };
+}
+
+function rankByLoad(
+  pool: NavigatorProfile[],
+  getActiveLoad: (id: string) => number,
+): Array<{ nav: NavigatorProfile; loadRatio: number }> {
+  return pool
+    .map((nav) => ({ nav, loadRatio: getActiveLoad(nav.id) / nav.capacity }))
+    .sort((a, b) => a.loadRatio - b.loadRatio || a.nav.id.localeCompare(b.nav.id));
 }
 
 /**
  * Assigns the best available navigator for the given routing input.
  *
- * @param input         Routing parameters (needCategory stored for audit; language drives filtering)
+ * @param input         Routing parameters (needCategory and language drive filtering)
  * @param navigators    Full roster (caller passes navigatorStore.list())
  * @param getActiveLoad Returns current active-session count for a navigator id
- * @param mode          "initial" restricts to general-intake navigators; "transfer" allows all
+ * @param mode          Retained for API compatibility; does not restrict routing behavior
  */
 export function assignNavigator(
   input: RoutingInput,
@@ -65,54 +64,69 @@ export function assignNavigator(
   getActiveLoad: (navigatorId: string) => number,
   mode: RoutingMode = "initial",
 ): RoutingOutcome {
-  const generalIntakeOnly = mode === "initial";
+  void mode;
 
-  // Step 1: availability filter
-  let candidates = navigators.filter((n) => n.status === "available");
+  // Step 1: available navigators with a non-zero capacity setting
+  const available = navigators.filter((n) => n.status === "available" && n.capacity > 0);
 
-  // Step 2: general-intake gate (initial assignments only)
-  if (generalIntakeOnly) {
-    candidates = candidates.filter((n) => n.isGeneralIntake);
-  }
+  // Step 2: exclude navigators at or above their capacity ceiling
+  const withCapacity = available.filter((n) => getActiveLoad(n.id) < n.capacity);
 
-  if (candidates.length === 0) {
+  if (withCapacity.length === 0) {
     return {
       assigned: false,
-      reason: generalIntakeOnly
-        ? "No available general-intake navigators"
-        : "No available navigators",
+      reason: available.length === 0
+        ? "No available navigators"
+        : "All navigators are at full capacity",
       routingVersion: ROUTING_VERSION,
     };
   }
 
-  // Step 3: language filter — hard rejection when language is requested and unmatched
-  const normalizedLang = input.language?.toLowerCase() ?? null;
-  if (normalizedLang) {
-    const langCandidates = candidates.filter((n) => n.languages.includes(normalizedLang));
-    if (langCandidates.length === 0) {
-      const scope = generalIntakeOnly ? "general-intake " : "";
+  const lang = input.language?.toLowerCase() ?? null;
+  const needsCategory = input.needCategory !== "other";
+
+  // Step 3 (PRIMARY): specialist match — category + language
+  if (needsCategory) {
+    let specialists = withCapacity.filter((n) =>
+      n.expertiseTags.map((t) => t.toLowerCase()).includes(input.needCategory.toLowerCase()),
+    );
+    if (lang) {
+      specialists = specialists.filter((n) =>
+        n.languages.map((l) => l.toLowerCase()).includes(lang),
+      );
+    }
+    if (specialists.length > 0) {
+      const best = rankByLoad(specialists, getActiveLoad)[0];
       return {
-        assigned: false,
-        reason: `No available ${scope}navigator speaks "${input.language}"`,
+        assigned: true,
+        navigator: best.nav,
+        routingReason: buildReason(lang, !!lang, true, best.loadRatio),
         routingVersion: ROUTING_VERSION,
       };
     }
-    candidates = langCandidates;
+    // No specialist available — fall through to any-navigator fallback
   }
 
-  // Step 4: sort by ascending load ratio, then stable id tie-breaker
-  const ranked = candidates
-    .map((nav) => ({
-      nav,
-      loadRatio: getActiveLoad(nav.id) / Math.max(nav.capacity, 1),
-    }))
-    .sort((a, b) => a.loadRatio - b.loadRatio || a.nav.id.localeCompare(b.nav.id));
+  // Step 4 (FALLBACK): any available navigator below capacity, language preserved
+  let fallback = withCapacity;
+  if (lang) {
+    fallback = withCapacity.filter((n) =>
+      n.languages.map((l) => l.toLowerCase()).includes(lang),
+    );
+    if (fallback.length === 0) {
+      return {
+        assigned: false,
+        reason: `No available navigator speaks "${input.language}"`,
+        routingVersion: ROUTING_VERSION,
+      };
+    }
+  }
 
-  const best = ranked[0];
+  const best = rankByLoad(fallback, getActiveLoad)[0];
   return {
     assigned: true,
     navigator: best.nav,
-    routingReason: buildReason(generalIntakeOnly, normalizedLang, !!normalizedLang, best.loadRatio),
+    routingReason: buildReason(lang, !!lang, false, best.loadRatio),
     routingVersion: ROUTING_VERSION,
   };
 }

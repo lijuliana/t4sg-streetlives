@@ -6,6 +6,7 @@ export interface Message {
   sender: string;
   body: string;
   timestamp: number;
+  pending?: boolean;
 }
 
 interface ChatMessageProps {
@@ -31,6 +32,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     <div
       className={styles.messageWrapper}
       data-own={String(isOwnMessage)}
+      data-pending={String(!!message.pending)}
     >
       {/* Sender label row */}
       <div
@@ -59,7 +61,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       </div>
 
       {/* Timestamp */}
-      <span className={styles.timestamp}>{time}</span>
+      <span className={styles.timestamp}>
+        {message.pending ? "Sending…" : time}
+      </span>
     </div>
   );
 };

@@ -5,6 +5,7 @@ import Link from "next/link";
 import moment from "moment";
 import { ChevronDown, Home } from "lucide-react";
 import { DashboardPoller } from "@/components/DashboardPoller";
+import { DeleteSessionButton } from "@/components/DeleteSessionButton";
 import { cn } from "@/lib/utils";
 
 interface Session {
@@ -23,12 +24,34 @@ interface Session {
   coaching_notes: string | null;
 }
 
+type AvailabilitySchedule = Record<string, { start: string; end: string }>;
+
 interface NavProfile {
   id: string;
   auth0_user_id: string;
+  first_name: string | null;
+  last_name: string | null;
   nav_group: string;
   status: string;
   capacity: number;
+  availability_schedule: AvailabilitySchedule | null;
+}
+
+const DAY_KEYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+function isInScheduledHours(schedule: AvailabilitySchedule | null | undefined): boolean {
+  if (!schedule) return false;
+  const now = new Date();
+  const slot = schedule[DAY_KEYS[now.getDay()]];
+  if (!slot) return false;
+  const toMins = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  const cur = now.getHours() * 60 + now.getMinutes();
+  return cur >= toMins(slot.start) && cur < toMins(slot.end);
+}
+
+function navDisplayName(nav: NavProfile): string {
+  const name = [nav.first_name, nav.last_name].filter(Boolean).join(" ");
+  return name || nav.nav_group.replace(/_/g, " ");
 }
 
 const AVATAR_COLORS = [
@@ -48,7 +71,15 @@ function avatarColor(name: string) {
   return AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
 }
 
-function SessionRow({ session, badge }: { session: Session; badge?: React.ReactNode }) {
+const STATUS_DOT: Record<string, string> = {
+  available: "bg-green-400",
+  away: "bg-amber-400",
+  offline: "bg-gray-300",
+};
+
+function SessionRow({ session, badge, navigator, deletable }: { session: Session; badge?: React.ReactNode; navigator?: NavProfile; deletable?: boolean }) {
+  const inHours = navigator ? isInScheduledHours(navigator.availability_schedule) : false;
+
   return (
     <Link
       href={`/dashboard/supervisor/${session.id}`}
@@ -60,7 +91,20 @@ function SessionRow({ session, badge }: { session: Session; badge?: React.ReactN
         </span>
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 capitalize">{session.need_category.replace(/_/g, " ")}</p>
+        {navigator && (
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[navigator.status] ?? "bg-gray-300"}`} />
+            <span className="text-sm font-medium text-gray-900 truncate">{navDisplayName(navigator)}</span>
+            {navigator.availability_schedule && (
+              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                inHours ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-400"
+              }`}>
+                {inHours ? "In hours" : "Out of hours"}
+              </span>
+            )}
+          </div>
+        )}
+        <p className="text-sm text-gray-500 capitalize">{session.need_category.replace(/_/g, " ")}</p>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           {badge}
           {session.language && (
@@ -84,6 +128,7 @@ function SessionRow({ session, badge }: { session: Session; badge?: React.ReactN
       )}>
         {session.status === "closed" ? "Closed" : "Active"}
       </span>
+      {deletable && <DeleteSessionButton sessionId={session.id} />}
     </Link>
   );
 }
@@ -103,8 +148,10 @@ function NavigatorRow({ nav, sessions }: { nav: NavProfile; sessions: Session[] 
   const closed = navSessions.filter((s) => s.status === "closed");
   const load = nav.capacity > 0 ? active.length / nav.capacity : 0;
   const barColor = load > 1 ? "bg-orange-400" : load >= 0.8 ? "bg-amber-400" : "bg-green-400";
-  const initials = avatarInitials(nav.nav_group);
-  const bg = avatarColor(nav.nav_group);
+  const displayName = navDisplayName(nav);
+  const initials = avatarInitials(displayName);
+  const bg = avatarColor(displayName);
+  const inHours = isInScheduledHours(nav.availability_schedule);
 
   return (
     <details suppressHydrationWarning className="group bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -113,8 +160,19 @@ function NavigatorRow({ nav, sessions }: { nav: NavProfile; sessions: Session[] 
           <span className="text-xs font-semibold text-white">{initials}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900">{nav.nav_group}</p>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[nav.status] ?? "bg-gray-300"}`} />
+            <p className="text-sm font-medium text-gray-900">{displayName}</p>
+            <p className="text-xs text-gray-400">{nav.nav_group.replace(/_/g, " ")}</p>
+            {nav.availability_schedule && (
+              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                inHours ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-400"
+              }`}>
+                {inHours ? "In hours" : "Out of hours"}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 mt-0.5 ml-3.5">
             <span className="text-green-600 font-medium">{active.length} active</span>
             {"  ·  "}
             <span>{closed.length} closed</span>
@@ -130,7 +188,7 @@ function NavigatorRow({ nav, sessions }: { nav: NavProfile; sessions: Session[] 
       {active.length > 0 && (
         <div className="px-4 pb-3 pt-2 space-y-2 border-t border-gray-100">
           {active.map((s) => (
-            <SessionRow key={s.id} session={s} />
+            <SessionRow key={s.id} session={s} navigator={nav} />
           ))}
         </div>
       )}
@@ -161,6 +219,8 @@ export default async function SupervisorDashboardPage() {
   const navigators: NavProfile[] = navsRes.ok
     ? Array.isArray(navsBody) ? navsBody : (navsBody.navigators ?? [])
     : [];
+
+  const navById = new Map(navigators.map((n) => [n.id, n]));
 
   const byRecent = (a: Session, b: Session) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -236,6 +296,8 @@ export default async function SupervisorDashboardPage() {
               <SessionRow
                 key={s.id}
                 session={s}
+                deletable
+                navigator={s.navigator_id ? navById.get(s.navigator_id) : undefined}
                 badge={s.submitted_for_review === true ? (
                   <span className="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full font-medium">
                     Needs Review
@@ -285,6 +347,7 @@ export default async function SupervisorDashboardPage() {
                 <SessionRow
                   key={s.id}
                   session={s}
+                  navigator={s.navigator_id ? navById.get(s.navigator_id) : undefined}
                   badge={
                     <span className="text-[10px] bg-orange-50 text-orange-500 px-1.5 py-0.5 rounded-full font-medium">
                       New Request
@@ -303,7 +366,7 @@ export default async function SupervisorDashboardPage() {
                 <p className="text-sm text-gray-400">No approved sessions yet</p>
               </div>
             ) : (
-              approvedArchive.map((s) => <SessionRow key={s.id} session={s} />)
+              approvedArchive.map((s) => <SessionRow key={s.id} session={s} deletable navigator={s.navigator_id ? navById.get(s.navigator_id) : undefined} />)
             )}
           </section>
         </div>

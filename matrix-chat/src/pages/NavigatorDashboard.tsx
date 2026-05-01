@@ -30,17 +30,37 @@ interface DashSession {
   referralId: string | null;
 }
 
+type AvailabilitySchedule = Record<string, { start: string; end: string }>;
+
 interface Navigator {
   id: string;
   userId: string;
+  firstName?: string;
+  lastName?: string;
   navGroup: NavGroup;
   expertiseTags: string[];
   languages: string[];
   capacity: number;
   status: NavStatus;
   isGeneralIntake: boolean;
+  availabilitySchedule?: AvailabilitySchedule;
   createdAt: string;
   updatedAt: string;
+}
+
+const DAY_KEYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+function isInScheduledHours(schedule: AvailabilitySchedule | undefined): boolean {
+  if (!schedule) return false;
+  const now = new Date();
+  const slot = schedule[DAY_KEYS[now.getDay()]];
+  if (!slot) return false;
+  const toMins = (t: string) => {
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  };
+  const cur = now.getHours() * 60 + now.getMinutes();
+  return cur >= toMins(slot.start) && cur < toMins(slot.end);
 }
 
 interface SessionEvent {
@@ -287,7 +307,7 @@ const TransferSection: React.FC<{
 }> = ({ session, navigators, onTransferred }) => {
   const [mode, setMode] = useState<"manual" | "auto">("manual");
   const [targetId, setTargetId] = useState("");
-  const [language, setLanguage] = useState(session.needCategory ?? "");
+  const [language, setLanguage] = useState("");
   const [reason, setReason] = useState("");
   const [transferring, setTransferring] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -940,6 +960,13 @@ const NavigatorPoolPanel: React.FC<{
           const loadPct = nav.capacity > 0 ? Math.round((load / nav.capacity) * 100) : 0;
           const loadLevel = loadPct >= 80 ? "high" : loadPct >= 50 ? "medium" : "low";
 
+          const displayName =
+            nav.firstName || nav.lastName
+              ? `${nav.firstName ?? ""} ${nav.lastName ?? ""}`.trim()
+              : nav.userId.replace(/@|:.*$/g, "");
+          const inHours = isInScheduledHours(nav.availabilitySchedule);
+          const hasSchedule = !!nav.availabilitySchedule;
+
           return (
             <div
               key={nav.id}
@@ -950,21 +977,26 @@ const NavigatorPoolPanel: React.FC<{
                 <div className={styles.navCardIdentity}>
                   <NavStatusDot status={nav.status} />
                   <div>
-                    <div className={styles.navCardName}>
-                      {nav.userId.replace(/@|:.*$/g, "")}
-                    </div>
-                    <div className={styles.navCardId}>{nav.id.slice(0, 12)}</div>
+                    <div className={styles.navCardName}>{displayName}</div>
+                    <div className={styles.navCardId}>{nav.navGroup.replace(/_/g, " ")}</div>
                   </div>
                 </div>
 
                 <div className={styles.navCardBadges}>
+                  {hasSchedule && (
+                    <span
+                      className={styles.availabilityBadge}
+                      data-in-hours={String(inHours)}
+                    >
+                      {inHours ? "In hours" : "Out of hours"}
+                    </span>
+                  )}
                   <span
                     className={styles.navRoleBadge}
                     data-intake={String(nav.isGeneralIntake)}
                   >
                     {nav.isGeneralIntake ? "INTAKE" : "SPECIALIST"}
                   </span>
-                  <span className={styles.navGroupBadge}>{nav.navGroup}</span>
                 </div>
               </div>
 

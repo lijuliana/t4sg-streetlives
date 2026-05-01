@@ -1033,6 +1033,25 @@
   border: 1px solid #e5e7eb;
 }
 
+.availabilityBadge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.availabilityBadge[data-in-hours="true"] {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.availabilityBadge[data-in-hours="false"] {
+  background: #f9fafb;
+  color: #9ca3af;
+  border: 1px solid #e5e7eb;
+}
+
 .navCardStats {
   display: flex;
   gap: 20px;

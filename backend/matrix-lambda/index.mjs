@@ -131,6 +131,45 @@ async function sendMessage(roomId, displayName, body) {
   return { eventId: data.event_id ?? null };
 }
 
+async function deleteRoom(roomId) {
+  const baseUrl = process.env.MATRIX_BASE_URL;
+  const token = await getToken();
+
+  // Try Synapse Admin API first (requires bot to be a server admin).
+  // This permanently purges the room and all its events.
+  const adminRes = await fetch(
+    `${baseUrl}/_synapse/admin/v2/rooms/${encodeURIComponent(roomId)}/delete`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ purge: true, block: false }),
+    }
+  );
+
+  if (adminRes.status === 404) {
+    return { deleted: true, method: "not_found" };
+  }
+
+  if (adminRes.ok) {
+    return { deleted: true, method: "admin_delete" };
+  }
+
+  // Bot is not a server admin (or homeserver is not Synapse) — fall back to
+  // having the bot leave the room so it becomes inaccessible.
+  const statusText = adminRes.status;
+  console.warn(`[deleteRoom] Admin delete failed (${statusText}), falling back to leave`);
+  try {
+    await matrixRequest("POST", `/rooms/${encodeURIComponent(roomId)}/leave`, {});
+  } catch (err) {
+    // Room may already be gone or bot already left — not fatal.
+    console.warn(`[deleteRoom] Leave fallback failed for ${roomId}:`, err.message);
+  }
+  return { deleted: true, method: "leave_fallback" };
+}
+
 async function fetchMessages(roomId) {
   const path = `/rooms/${encodeURIComponent(roomId)}/messages?dir=b&limit=200`;
   const data = await matrixRequest("GET", path, null);
@@ -172,6 +211,11 @@ export const handler = async (event) => {
       case "fetchMessages": {
         if (!event.roomId) throw new Error("Missing roomId");
         return await fetchMessages(event.roomId);
+      }
+
+      case "deleteRoom": {
+        if (!event.roomId) throw new Error("Missing roomId");
+        return await deleteRoom(event.roomId);
       }
 
       default:

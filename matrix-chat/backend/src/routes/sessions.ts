@@ -67,9 +67,9 @@ const VALID_NEED_CATEGORIES: NeedCategory[] = [
  *
  * Creates a new guest chat session:
  *   1. Creates a private Matrix room via the service account.
- *   2. Runs routing (mode: "initial") — finds the best available general-intake navigator.
+ *   2. Runs routing — finds the best available navigator (specialist preferred, any as fallback).
  *   3. If routing succeeds: status = "active", navigator invited to Matrix room.
- *      If routing fails:   status = "unassigned", routingFailReason recorded.
+ *      If routing fails (no capacity / language unmatched): status = "unassigned", reason recorded.
  *   4. Emits "created" and (if assigned) "assigned" audit events.
  */
 router.post("/", async (req: Request, res: Response) => {

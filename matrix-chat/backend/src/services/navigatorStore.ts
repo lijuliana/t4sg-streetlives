@@ -26,12 +26,15 @@ class InMemoryNavigatorStore implements NavigatorStoreInterface {
     const profile: NavigatorProfile = {
       id: randomUUID(),
       userId: data.userId,
+      firstName: data.firstName,
+      lastName: data.lastName,
       navGroup: data.navGroup,
       expertiseTags: data.expertiseTags ?? [],
       languages: (data.languages ?? ["en"]).map((l) => l.toLowerCase()),
       capacity: data.capacity ?? DEFAULT_CAPACITY,
       status: data.status ?? DEFAULT_STATUS,
       isGeneralIntake: data.isGeneralIntake ?? false,
+      availabilitySchedule: data.availabilitySchedule,
       createdAt: now,
       updatedAt: now,
     };
@@ -50,12 +53,15 @@ class InMemoryNavigatorStore implements NavigatorStoreInterface {
   update(id: string, data: UpdateNavigatorProfileRequest): NavigatorProfile | undefined {
     const profile = this.navigators.get(id);
     if (!profile) return undefined;
+    if (data.firstName !== undefined) profile.firstName = data.firstName;
+    if (data.lastName !== undefined) profile.lastName = data.lastName;
     if (data.navGroup !== undefined) profile.navGroup = data.navGroup;
     if (data.expertiseTags !== undefined) profile.expertiseTags = data.expertiseTags;
     if (data.languages !== undefined) profile.languages = data.languages.map((l) => l.toLowerCase());
     if (data.capacity !== undefined) profile.capacity = data.capacity;
     if (data.status !== undefined) profile.status = data.status;
     if (data.isGeneralIntake !== undefined) profile.isGeneralIntake = data.isGeneralIntake;
+    if (data.availabilitySchedule !== undefined) profile.availabilitySchedule = data.availabilitySchedule;
     profile.updatedAt = new Date().toISOString();
     return profile;
   }

@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { navigatorStore } from "../services/navigatorStore.js";
 import type {
+  AvailabilitySchedule,
   CreateNavigatorProfileRequest,
   UpdateNavigatorProfileRequest,
   NavGroup,
@@ -60,6 +61,15 @@ router.post("/", (req: Request, res: Response) => {
     return;
   }
 
+  if (body.firstName !== undefined && typeof body.firstName !== "string") {
+    res.status(400).json({ error: "firstName must be a string" });
+    return;
+  }
+  if (body.lastName !== undefined && typeof body.lastName !== "string") {
+    res.status(400).json({ error: "lastName must be a string" });
+    return;
+  }
+
   if (navigatorStore.findByUserId(body.userId.trim())) {
     res.status(409).json({ error: "A navigator profile already exists for this userId" });
     return;
@@ -67,12 +77,15 @@ router.post("/", (req: Request, res: Response) => {
 
   const profile = navigatorStore.create({
     userId: body.userId.trim(),
+    firstName: typeof body.firstName === "string" ? body.firstName.trim() : undefined,
+    lastName: typeof body.lastName === "string" ? body.lastName.trim() : undefined,
     navGroup: body.navGroup as NavGroup,
     expertiseTags: (body.expertiseTags as string[] | undefined) ?? [],
     languages: body.languages as string[] | undefined,
     capacity: body.capacity as number | undefined,
     status: body.status as NavigatorStatus | undefined,
     isGeneralIntake: body.isGeneralIntake as boolean | undefined,
+    availabilitySchedule: body.availabilitySchedule as AvailabilitySchedule | undefined,
   });
 
   res.status(201).json(profile);
@@ -133,12 +146,15 @@ router.patch("/:id", (req: Request, res: Response) => {
   }
 
   const updated = navigatorStore.update(req.params.id, {
+    firstName: typeof body.firstName === "string" ? body.firstName.trim() : undefined,
+    lastName: typeof body.lastName === "string" ? body.lastName.trim() : undefined,
     navGroup: body.navGroup as NavGroup | undefined,
     expertiseTags: body.expertiseTags as string[] | undefined,
     languages: body.languages as string[] | undefined,
     capacity: body.capacity as number | undefined,
     status: body.status as NavigatorStatus | undefined,
     isGeneralIntake: body.isGeneralIntake as boolean | undefined,
+    availabilitySchedule: body.availabilitySchedule as AvailabilitySchedule | undefined,
   });
 
   if (!updated) {
