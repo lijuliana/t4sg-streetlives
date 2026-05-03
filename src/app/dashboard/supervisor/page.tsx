@@ -2,8 +2,27 @@ import { auth0 } from "@/lib/auth0";
 import { lambdaFetch } from "@/lib/lambda";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import moment from "moment";
 import { ChevronDown, Home } from "lucide-react";
+import ShowMoreList from "@/components/ShowMoreList";
+
+const CATEGORY_ICONS: Record<string, string> = {
+  housing:        "/new-icons/house.svg",
+  accommodations: "/new-icons/house.svg",
+  health:         "/new-icons/heart-chart.svg",
+  benefits:       "/new-icons/checklist.svg",
+  work:           "/new-icons/checklist.svg",
+  legal:          "/new-icons/scales.svg",
+  food:           "/new-icons/store.svg",
+  clothing:       "/new-icons/bag.svg",
+  personal_care:  "/new-icons/umbrella.svg",
+  family_services:"/new-icons/person.svg",
+  youth_services: "/new-icons/person.svg",
+  connection:     "/new-icons/wifi.svg",
+  education:      "/new-icons/checklist.svg",
+  other:          "/new-icons/chat.svg",
+};
 import { DashboardPoller } from "@/components/DashboardPoller";
 import { cn } from "@/lib/utils";
 
@@ -54,10 +73,14 @@ function SessionRow({ session, badge }: { session: Session; badge?: React.ReactN
       href={`/dashboard/supervisor/${session.id}`}
       className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3 hover:border-gray-300 hover:shadow-sm transition"
     >
-      <div className="w-9 h-9 rounded-full bg-brand-yellow flex items-center justify-center flex-shrink-0">
-        <span className="text-xs font-medium text-gray-900">
-          {session.need_category.slice(0, 2).toUpperCase()}
-        </span>
+      <div className="w-9 h-9 rounded-full bg-white border border-gray-200 flex items-center justify-center flex-shrink-0">
+        <Image
+          src={CATEGORY_ICONS[session.need_category] ?? "/new-icons/chat.svg"}
+          alt=""
+          width={20}
+          height={20}
+          aria-hidden
+        />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-gray-900 capitalize">{session.need_category.replace(/_/g, " ")}</p>
@@ -303,7 +326,9 @@ export default async function SupervisorDashboardPage() {
                 <p className="text-sm text-gray-400">No approved sessions yet</p>
               </div>
             ) : (
-              approvedArchive.map((s) => <SessionRow key={s.id} session={s} />)
+              <ShowMoreList>
+                {approvedArchive.map((s) => <SessionRow key={s.id} session={s} />)}
+              </ShowMoreList>
             )}
           </section>
         </div>

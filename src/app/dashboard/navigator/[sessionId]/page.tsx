@@ -4,10 +4,27 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import Link from "next/link";
+import Image from "next/image";
 import { ArrowLeft, Send, Circle, UserPlus, ArrowRight, CheckCircle, Home } from "lucide-react";
 import moment from "moment";
 import { cn } from "@/lib/utils";
+
+const CATEGORY_ICONS: Record<string, string> = {
+  housing:        "/new-icons/house.svg",
+  accommodations: "/new-icons/house.svg",
+  health:         "/new-icons/heart-chart.svg",
+  benefits:       "/new-icons/checklist.svg",
+  work:           "/new-icons/checklist.svg",
+  legal:          "/new-icons/scales.svg",
+  food:           "/new-icons/store.svg",
+  clothing:       "/new-icons/bag.svg",
+  personal_care:  "/new-icons/umbrella.svg",
+  family_services:"/new-icons/person.svg",
+  youth_services: "/new-icons/person.svg",
+  connection:     "/new-icons/wifi.svg",
+  education:      "/new-icons/checklist.svg",
+  other:          "/new-icons/chat.svg",
+};
 import { isProfileComplete } from "@/lib/store";
 import type { NavigatorProfile } from "@/lib/store";
 
@@ -121,6 +138,7 @@ export default function NavigatorSessionDetailPage() {
   // Close flow
   const [showClosePanel, setShowClosePanel] = useState(false);
   const [selectedOutcomes, setSelectedOutcomes] = useState<string[]>([]);
+  const [closeReason, setCloseReason] = useState("");
   const [closing, setClosing] = useState(false);
 
   // Chat
@@ -267,6 +285,7 @@ export default function NavigatorSessionDetailPage() {
         body: JSON.stringify({
           outcome: selectedOutcomes,
           submitted_for_review: true,
+          ...(closeReason.trim() ? { notes: closeReason.trim() } : {}),
         }),
       });
       toast.success("Session closed and submitted for review");
@@ -337,6 +356,9 @@ export default function NavigatorSessionDetailPage() {
         >
           <ArrowLeft size={20} strokeWidth={2} />
         </button>
+        <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center flex-shrink-0">
+          <Image src={CATEGORY_ICONS[session.need_category] ?? "/new-icons/chat.svg"} alt="" width={18} height={18} aria-hidden />
+        </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-gray-900 capitalize">{categoryLabel}</p>
           <p className="text-xs text-gray-400">
@@ -480,6 +502,17 @@ export default function NavigatorSessionDetailPage() {
                     </label>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-500">Reason <span className="text-gray-400">(optional)</span></label>
+                <textarea
+                  value={closeReason}
+                  onChange={(e) => setCloseReason(e.target.value)}
+                  placeholder="Add any notes about why this session is closing…"
+                  rows={2}
+                  className="mt-1 w-full text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-gray-300"
+                />
               </div>
 
               <div className="flex gap-2">

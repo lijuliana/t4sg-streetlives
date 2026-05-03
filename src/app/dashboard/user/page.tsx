@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import moment from "moment";
+import { ChevronDown } from "lucide-react";
 import DashboardShell from "@/components/DashboardShell";
 import { getSession } from "@/lib/chatApi";
 
@@ -59,8 +60,11 @@ export default function UserDashboardPage() {
 
   return (
     <DashboardShell title="My Sessions" role="user">
-      <section>
-        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Active Session</h2>
+      <details open className="group">
+        <summary className="flex items-center justify-between cursor-pointer list-none select-none mb-3">
+          <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide">Active Session</h2>
+          <ChevronDown size={14} className="text-gray-400 group-open:rotate-180 transition-transform" />
+        </summary>
         {!active ? (
           <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center space-y-3">
             <p className="text-sm text-gray-500">You don&apos;t have an active session.</p>
@@ -99,16 +103,20 @@ export default function UserDashboardPage() {
                 localStorage.removeItem("sl_session_state");
                 window.location.href = "/chat";
               }}
+              aria-label="Start a new chat instead"
               className="w-full text-xs text-gray-400 hover:text-gray-600 text-center py-1 transition"
             >
               Start a new chat instead →
             </button>
           </div>
         )}
-      </section>
+      </details>
 
-      <section>
-        <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-3">Past Sessions</h2>
+      <details open className="group">
+        <summary className="flex items-center justify-between cursor-pointer list-none select-none mb-3">
+          <h2 className="text-xs font-normal text-gray-500 uppercase tracking-wide">Past Sessions</h2>
+          <ChevronDown size={14} className="text-gray-400 group-open:rotate-180 transition-transform" />
+        </summary>
         {past.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-md px-5 py-8 text-center">
             <p className="text-sm text-gray-400">No past sessions yet</p>
@@ -138,7 +146,7 @@ export default function UserDashboardPage() {
             ))}
           </div>
         )}
-      </section>
+      </details>
     </DashboardShell>
   );
 }
