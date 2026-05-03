@@ -53,6 +53,13 @@ interface LocalMessage {
   timestamp: string;
 }
 
+function resolveActorName(actorId: string, navList: NavProfile[]): string {
+  if (actorId === "system") return "System";
+  if (actorId === "user" || actorId.endsWith("@clients")) return "User";
+  const nav = navList.find((n) => n.auth0_user_id === actorId || n.id === actorId);
+  return nav ? (nav.nav_group || actorId) : "Supervisor";
+}
+
 const EVENT_LABELS: Record<SessionEvent["event_type"], string> = {
   created: "Session created",
   assigned: "Assigned to navigator",
@@ -379,7 +386,7 @@ export default function SupervisorSessionDetailPage() {
                       <p className="text-sm text-gray-700">{EVENT_LABELS[event.event_type]}</p>
                       <p className="text-xs text-gray-400 mt-0.5">
                         {moment(event.created_at).format("MMM D [at] h:mm A")}
-                        {event.actor_id ? ` · ${event.actor_id}` : ""}
+                        {event.actor_id ? ` · ${resolveActorName(event.actor_id, navigators)}` : ""}
                       </p>
                     </div>
                   </div>
@@ -400,7 +407,7 @@ export default function SupervisorSessionDetailPage() {
               >
                 <option value="">Select a navigator…</option>
                 {navigators
-                  .filter((n) => n.id !== session.navigator_id)
+                  .filter((n) => n.id !== session.navigator_id && n.status === "available")
                   .map((n) => (
                     <option key={n.id} value={n.id}>{n.nav_group}</option>
                   ))}
@@ -431,16 +438,16 @@ export default function SupervisorSessionDetailPage() {
                 />
               </div>
               <div>
-                <p className="text-xs text-gray-500 mb-1.5">Transfer to navigator (optional)</p>
+                <p className="text-xs text-gray-500 mb-1.5">Transfer to navigator <span className="text-red-500">*</span></p>
                 <select
                   aria-label="Transfer to navigator on return"
                   value={returnTransferTarget}
                   onChange={(e) => setReturnTransferTarget(e.target.value)}
                   className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
                 >
-                  <option value="">Keep current navigator</option>
+                  <option value="" disabled>Select a navigator…</option>
                   {navigators
-                    .filter((n) => n.id !== session.navigator_id)
+                    .filter((n) => n.id !== session.navigator_id && n.status === "available")
                     .map((n) => (
                       <option key={n.id} value={n.id}>{n.nav_group}</option>
                     ))}
@@ -450,7 +457,7 @@ export default function SupervisorSessionDetailPage() {
                 <button
                   type="button"
                   onClick={handleReturn}
-                  disabled={returning || approving}
+                  disabled={returning || approving || !returnTransferTarget}
                   className="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-50 transition disabled:opacity-50"
                 >
                   {returning ? "Returning…" : "Return to Navigator"}

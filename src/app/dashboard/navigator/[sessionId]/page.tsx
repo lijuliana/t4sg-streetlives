@@ -50,6 +50,7 @@ function navFullName(n: NavProfile): string {
 
 function resolveActorName(actorId: string, navList: NavProfile[]): string {
   if (actorId === "system") return "System";
+  if (actorId === "user" || actorId.endsWith("@clients")) return "User";
   const nav = navList.find((n) => n.auth0_user_id === actorId || n.id === actorId);
   return nav ? navFullName(nav) : "Supervisor";
 }
@@ -386,6 +387,14 @@ const categoryLabel = session.need_category.replace(/_/g, " ");
             )}
           </div>
 
+          {/* Supervisor coaching notes — shown after a return */}
+          {session.coaching_notes && !session.approved && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-1">
+              <p className="text-xs font-medium text-amber-700 uppercase tracking-wide">Returned by Supervisor</p>
+              <p className="text-sm text-amber-900 whitespace-pre-wrap">{session.coaching_notes}</p>
+            </div>
+          )}
+
           {/* Session notes */}
           <div>
             <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Session Notes</h2>
@@ -438,7 +447,7 @@ const categoryLabel = session.need_category.replace(/_/g, " ");
               >
                 <option value="">Select a navigator…</option>
                 {navigators
-                  .filter((n) => n.id !== myProfile?.id)
+                  .filter((n) => n.id !== myProfile?.id && n.status === "available")
                   .map((n) => (
                     <option key={n.id} value={n.id}>{navFullName(n)}</option>
                   ))}

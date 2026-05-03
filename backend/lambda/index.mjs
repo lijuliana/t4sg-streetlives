@@ -696,7 +696,7 @@ export const handler = async (event) => {
     } catch (err) {
       return respond(401, { error: "Unauthorized: " + err.message });
     }
-    const actorSub = jwtPayload.sub;
+    const actorSub = jwtPayload.sub?.endsWith("@clients") ? "user" : jwtPayload.sub;
 
     // GET /sessions  (list all)
     if (method === "GET" && segments[0] === "sessions" && segments.length === 1) {
