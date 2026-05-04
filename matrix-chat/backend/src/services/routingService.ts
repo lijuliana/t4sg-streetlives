@@ -27,17 +27,18 @@ import type {
   RoutingReason,
 } from "../types.js";
 
-export const ROUTING_VERSION = "v5_tiered_category_lang_schedule_capacity";
+export const ROUTING_VERSION = "v6_tiered_category_lang_schedule_capacity";
 
 const DAY_ABBREVIATIONS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 /**
  * Returns true when `now` falls within the navigator's availability window for the current day.
- * If no schedule is configured (undefined or empty), the navigator is always schedule-eligible.
+ * Navigators with no schedule (undefined or empty) are NOT eligible — an empty schedule indicates
+ * an incomplete onboarding profile.
  */
 export function isWithinSchedule(nav: NavigatorProfile, now: Date): boolean {
   const schedule = nav.availabilitySchedule;
-  if (!schedule || Object.keys(schedule).length === 0) return true;
+  if (!schedule || Object.keys(schedule).length === 0) return false;
 
   const dayKey = DAY_ABBREVIATIONS[now.getDay()];
   const hours = schedule[dayKey];
@@ -63,8 +64,21 @@ function routingLog(entry: {
   selected: string | null;
   outcome: "assigned" | "unassigned";
   failReason: string | null;
+  routingReason?: RoutingReason;
 }): void {
   console.log(`[routing] ${JSON.stringify(entry)}`);
+  if (entry.routingReason) {
+    const r = entry.routingReason;
+    console.log(
+      `[routing:reason] assigned to ${entry.selected}` +
+      ` tier=${entry.tier}` +
+      ` languageRequested=${r.languageRequested ?? "none"} languageMatch=${r.languageMatch}` +
+      ` needCategoryMatch=${r.needCategoryMatch}` +
+      ` loadRatio=${r.loadRatio.toFixed(3)}`,
+    );
+  } else if (entry.failReason) {
+    console.log(`[routing:reason] unassigned — ${entry.failReason}`);
+  }
 }
 
 function buildReason(
@@ -74,7 +88,6 @@ function buildReason(
   loadRatio: number,
 ): RoutingReason {
   return {
-    generalIntakeOnly: false,
     languageRequested,
     languageMatch,
     needCategoryMatch,
@@ -130,6 +143,31 @@ export function assignNavigator(
     pool: withCapacity.length,
   };
 
+  // Per-navigator diagnostic log: shows exactly why each navigator was included or excluded.
+  const dayKey = DAY_ABBREVIATIONS[now.getDay()];
+  console.log(`[routing:navigators] request=category:${input.needCategory} language:${input.language ?? "any"} time:${now.toISOString()} day:${dayKey}`);
+  for (const n of navigators) {
+    const load = getActiveLoad(n.id);
+    const scheduleEntry = n.availabilitySchedule?.[dayKey];
+    const scheduleStr = n.availabilitySchedule
+      ? (scheduleEntry ? `${scheduleEntry.start}-${scheduleEntry.end}` : `no entry for ${dayKey}`)
+      : "no schedule (incomplete)";
+    let exclusionReason = "";
+    if (n.status !== "available") exclusionReason = `status=${n.status}`;
+    else if (n.capacity <= 0) exclusionReason = `capacity=${n.capacity}`;
+    else if (!isWithinSchedule(n, now)) exclusionReason = `outside schedule [${scheduleStr}]`;
+    else if (load >= n.capacity) exclusionReason = `over capacity (${load}/${n.capacity})`;
+    const eligible = exclusionReason === "";
+    console.log(
+      `[routing:navigators]   ${eligible ? "✓" : "✗"} id=${n.id} userId=${n.userId}` +
+      ` status=${n.status} load=${load}/${n.capacity}` +
+      ` schedule=[${scheduleStr}]` +
+      ` tags=[${n.expertiseTags.join(",")}]` +
+      ` languages=[${n.languages.join(",")}]` +
+      (exclusionReason ? ` → EXCLUDED: ${exclusionReason}` : " → eligible"),
+    );
+  }
+
   if (withCapacity.length === 0) {
     const reason = available.length === 0
       ? "No available navigators"
@@ -141,10 +179,14 @@ export function assignNavigator(
   const lang = input.language?.toLowerCase() ?? null;
   const needsCategory = input.needCategory !== "other";
 
+  // Normalises a tag or category slug for comparison: lowercase, strip spaces and underscores.
+  // Allows "Personal Care" tags to match "personal_care" slugs and vice versa.
+  const normalize = (s: string) => s.toLowerCase().replace(/[\s_]/g, "");
+
   // Step 3 (PRIMARY): specialist match — category + language
   if (needsCategory) {
     let specialists = withCapacity.filter((n) =>
-      n.expertiseTags.map((t) => t.toLowerCase()).includes(input.needCategory.toLowerCase()),
+      n.expertiseTags.some((t) => normalize(t) === normalize(input.needCategory)),
     );
     if (lang) {
       specialists = specialists.filter((n) =>
@@ -154,11 +196,12 @@ export function assignNavigator(
     if (specialists.length > 0) {
       const ranked = rankByLoad(specialists, getActiveLoad);
       const best = ranked[0];
-      routingLog({ ...logBase, tier: "primary", candidates: ranked.map((r) => ({ id: r.nav.id, ratio: r.loadRatio })), selected: best.nav.id, outcome: "assigned", failReason: null });
+      const reason = buildReason(lang, !!lang, true, best.loadRatio);
+      routingLog({ ...logBase, tier: "primary", candidates: ranked.map((r) => ({ id: r.nav.id, ratio: r.loadRatio })), selected: best.nav.id, outcome: "assigned", failReason: null, routingReason: reason });
       return {
         assigned: true,
         navigator: best.nav,
-        routingReason: buildReason(lang, !!lang, true, best.loadRatio),
+        routingReason: reason,
         routingVersion: ROUTING_VERSION,
       };
     }
@@ -180,11 +223,12 @@ export function assignNavigator(
 
   const ranked = rankByLoad(fallback, getActiveLoad);
   const best = ranked[0];
-  routingLog({ ...logBase, tier: "fallback", candidates: ranked.map((r) => ({ id: r.nav.id, ratio: r.loadRatio })), selected: best.nav.id, outcome: "assigned", failReason: null });
+  const reason = buildReason(lang, !!lang, false, best.loadRatio);
+  routingLog({ ...logBase, tier: "fallback", candidates: ranked.map((r) => ({ id: r.nav.id, ratio: r.loadRatio })), selected: best.nav.id, outcome: "assigned", failReason: null, routingReason: reason });
   return {
     assigned: true,
     navigator: best.nav,
-    routingReason: buildReason(lang, !!lang, false, best.loadRatio),
+    routingReason: reason,
     routingVersion: ROUTING_VERSION,
   };
 }

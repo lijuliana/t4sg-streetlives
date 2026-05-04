@@ -18,7 +18,7 @@ export interface NavigatorProfile {
   languages: string[];        // ISO 639-1 codes, lowercase
   capacity: number;           // max concurrent active sessions
   status: NavigatorStatus;
-  isGeneralIntake: boolean;   // if true, eligible for initial session assignment
+  isGeneralIntake: boolean;   // retained for data compatibility; not used in routing
   availabilitySchedule?: AvailabilitySchedule; // keyed by "Mon"–"Sun"
   createdAt: string;          // ISO 8601
   updatedAt: string;          // ISO 8601
@@ -27,12 +27,15 @@ export interface NavigatorProfile {
 // ── Need categories ───────────────────────────────────────────────────────────
 
 export type NeedCategory =
-  | "housing"
-  | "employment"
+  | "accommodations"
+  | "food"
+  | "clothing"
+  | "personal_care"
   | "health"
-  | "benefits"
-  | "youth_services"
-  | "education"
+  | "family_services"
+  | "work"
+  | "legal"
+  | "connection"
   | "other";
 
 // ── Routing types ─────────────────────────────────────────────────────────────
@@ -47,7 +50,6 @@ export interface RoutingInput {
 
 /** Explainability payload included in successful assignments. */
 export interface RoutingReason {
-  generalIntakeOnly: boolean;     // true for initial assignment, false for transfer
   languageRequested: string | null;
   languageMatch: boolean;         // true when language was requested and matched
   needCategoryMatch: boolean;     // true when needCategory was specific (not "other") and matched

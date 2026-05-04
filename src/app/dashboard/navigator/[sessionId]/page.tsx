@@ -31,6 +31,7 @@ interface Session {
   submitted_for_review: boolean | null;
   approved: boolean | null;
   coaching_notes: string | null;
+  transfer_requested?: boolean | null;
 }
 
 interface NavProfile {
@@ -122,9 +123,9 @@ export default function NavigatorSessionDetailPage() {
   const [myFullProfile, setMyFullProfile] = useState<NavigatorProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Transfer
-  const [transferTarget, setTransferTarget] = useState("");
-  const [transferring, setTransferring] = useState(false);
+  // Transfer request
+  const [transferRequested, setTransferRequested] = useState(false);
+  const [requestingTransfer, setRequestingTransfer] = useState(false);
 
   // Notes
   const [notes, setNotes] = useState("");
@@ -181,9 +182,11 @@ export default function NavigatorSessionDetailPage() {
         eventsRes.json(),
       ]);
       const navList: NavProfile[] = Array.isArray(navs) ? navs : [];
-setSession(s);
+      setSession(s);
       setEvents(Array.isArray(evts) ? evts : []);
       setNotes(s.notes ?? "");
+      // Lambda doesn't store transfer_requested — restore from localStorage
+      setTransferRequested(localStorage.getItem(`sl_xfer_${sessionId}`) === "true");
       setNavigators(navList);
 
       if (meRes.ok) {
@@ -243,25 +246,19 @@ setSession(s);
     }
   };
 
-  const handleTransfer = async () => {
-    if (!transferTarget) return;
-    setTransferring(true);
+  const handleRequestTransfer = async () => {
+    setRequestingTransfer(true);
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/transfer`, {
-        method: "POST",
+      await fetch(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_navigator_id: transferTarget }),
+        body: JSON.stringify({ transfer_requested: true }),
       });
-      if (res.ok) {
-        toast.success("Session transferred");
-        router.refresh();
-        router.push("/dashboard/navigator");
-      } else {
-        const err = await res.json().catch(() => ({}));
-        toast.error(err.error ?? "Transfer failed");
-      }
+      setTransferRequested(true);
+      localStorage.setItem(`sl_xfer_${sessionId}`, "true");
+      toast.success("Transfer requested — a supervisor will reassign this session");
     } finally {
-      setTransferring(false);
+      setRequestingTransfer(false);
     }
   };
 
@@ -435,31 +432,25 @@ const categoryLabel = session.need_category.replace(/_/g, " ");
           </div>
 
 
-          {/* Transfer */}
+          {/* Request Transfer */}
           {!isClosed && (
             <div className="space-y-2">
               <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Transfer Session</h2>
-              <select
-                aria-label="Select navigator to transfer to"
-                value={transferTarget}
-                onChange={(e) => setTransferTarget(e.target.value)}
-                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
-              >
-                <option value="">Select a navigator…</option>
-                {navigators
-                  .filter((n) => n.id !== myProfile?.id && n.status === "available")
-                  .map((n) => (
-                    <option key={n.id} value={n.id}>{navFullName(n)}</option>
-                  ))}
-              </select>
-              <button
-                type="button"
-                onClick={handleTransfer}
-                disabled={!transferTarget || transferring}
-                className="w-full border border-gray-200 text-gray-700 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-50 transition disabled:opacity-40"
-              >
-                {transferring ? "Transferring…" : "Transfer"}
-              </button>
+              {transferRequested ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                  <p className="text-xs font-medium text-amber-700">Transfer requested</p>
+                  <p className="text-xs text-amber-600 mt-0.5">A supervisor will reassign this session.</p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleRequestTransfer}
+                  disabled={requestingTransfer}
+                  className="w-full border border-gray-200 text-gray-700 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-50 transition disabled:opacity-40"
+                >
+                  {requestingTransfer ? "Requesting…" : "Request Transfer"}
+                </button>
+              )}
             </div>
           )}
 

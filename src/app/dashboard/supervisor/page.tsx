@@ -1,5 +1,6 @@
 import { auth0 } from "@/lib/auth0";
 import { lambdaFetch } from "@/lib/lambda";
+import { isTransferRequested } from "@/lib/transferRequestStore";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import moment from "moment";
@@ -22,6 +23,7 @@ interface Session {
   outcome: string[] | null;
   follow_up_date: string | null;
   coaching_notes: string | null;
+  transfer_requested?: boolean | null;
 }
 
 type AvailabilitySchedule = Record<string, { start: string; end: string }>;
@@ -35,6 +37,17 @@ interface NavProfile {
   status: string;
   capacity: number;
   availability_schedule: AvailabilitySchedule | null;
+  expertise_tags: string[] | null;
+  languages: string[] | null;
+}
+
+function needsOnboarding(nav: NavProfile): boolean {
+  return (
+    !nav.expertise_tags?.length ||
+    !nav.languages?.length ||
+    !nav.availability_schedule ||
+    Object.keys(nav.availability_schedule).length === 0
+  );
 }
 
 const DAY_KEYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
@@ -164,7 +177,11 @@ function NavigatorRow({ nav, sessions }: { nav: NavProfile; sessions: Session[] 
             <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[nav.status] ?? "bg-gray-300"}`} />
             <p className="text-sm font-medium text-gray-900">{displayName}</p>
             <p className="text-xs text-gray-400">{nav.nav_group.replace(/_/g, " ")}</p>
-            {nav.availability_schedule && (
+            {needsOnboarding(nav) ? (
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-600">
+                Needs Onboarding
+              </span>
+            ) : nav.availability_schedule && (
               <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
                 inHours ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-400"
               }`}>
@@ -188,7 +205,16 @@ function NavigatorRow({ nav, sessions }: { nav: NavProfile; sessions: Session[] 
       {active.length > 0 && (
         <div className="px-4 pb-3 pt-2 space-y-2 border-t border-gray-100">
           {active.map((s) => (
-            <SessionRow key={s.id} session={s} navigator={nav} />
+            <SessionRow
+              key={s.id}
+              session={s}
+              navigator={nav}
+              badge={isTransferRequested(s.id) ? (
+                <span className="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full font-medium">
+                  Transfer Requested
+                </span>
+              ) : undefined}
+            />
           ))}
         </div>
       )}
@@ -230,6 +256,7 @@ export default async function SupervisorDashboardPage() {
     .sort(byRecent);
 
   const active = allSessions.filter((s) => s.status !== "closed");
+  const transferRequested = active.filter((s) => isTransferRequested(s.id)).sort(byRecent);
   const unassigned = allSessions.filter((s) => s.navigator_id === null && s.status !== "closed").sort(byRecent);
   const approvedArchive = allSessions
     .filter((s) => s.approved === true)
@@ -324,6 +351,36 @@ export default async function SupervisorDashboardPage() {
             ) : (
               navigators.map((nav) => (
                 <NavigatorRow key={nav.id} nav={nav} sessions={allSessions} />
+              ))
+            )}
+          </section>
+
+          {/* Transfer Requested */}
+          <section className="space-y-2">
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center gap-2">
+              Transfer Requested
+              {transferRequested.length > 0 && (
+                <span className="bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full text-[10px] font-semibold">
+                  {transferRequested.length}
+                </span>
+              )}
+            </h2>
+            {transferRequested.length === 0 ? (
+              <div className="bg-white border border-gray-200 rounded-xl px-5 py-8 text-center">
+                <p className="text-sm text-gray-400">No transfer requests</p>
+              </div>
+            ) : (
+              transferRequested.map((s) => (
+                <SessionRow
+                  key={s.id}
+                  session={s}
+                  navigator={s.navigator_id ? navById.get(s.navigator_id) : undefined}
+                  badge={
+                    <span className="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full font-medium">
+                      Transfer Requested
+                    </span>
+                  }
+                />
               ))
             )}
           </section>

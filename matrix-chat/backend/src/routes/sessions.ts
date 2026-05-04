@@ -58,7 +58,8 @@ const MATRIX_SYNC_THROTTLE_MS = 5_000;
 const lastMatrixSync = new Map<string, number>();
 
 const VALID_NEED_CATEGORIES: NeedCategory[] = [
-  "housing", "employment", "health", "benefits", "youth_services", "education", "other",
+  "accommodations", "food", "clothing", "personal_care", "health",
+  "family_services", "work", "legal", "connection", "other",
 ];
 
 // ── Session lifecycle ─────────────────────────────────────────────────────────

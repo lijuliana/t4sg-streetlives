@@ -103,6 +103,12 @@ export default async function NavigatorDashboardPage() {
 
   const navsBody = navsRes.ok ? await navsRes.json().catch(() => []) : [];
   const navList: NavProfile[] = Array.isArray(navsBody) ? navsBody : (navsBody.navigators ?? []);
+
+  if (navList.length > 0) {
+    console.log("[navigators] sample full object:", JSON.stringify(navList[0], null, 2));
+    console.log("[navigators] total:", navList.length);
+  }
+
   const myProfile = navList.find((n) => n.auth0_user_id === session.user.sub) ?? null;
 
   // No profile yet — require setup before anything else
