@@ -24,6 +24,9 @@ const CATEGORY_ICONS: Record<string, string> = {
 };
 import { OverdueFlair } from "@/components/OverdueFlair";
 import { DashboardPoller } from "@/components/DashboardPoller";
+import { isProfileComplete } from "@/lib/store";
+import type { NavigatorProfile } from "@/lib/store";
+import { normalizeNavigatorFromLambda } from "@/lib/navigatorProfile";
 
 interface RealSession {
   id: string;
@@ -119,31 +122,41 @@ export default async function NavigatorDashboardPage() {
   const session = await auth0.getSession();
   if (!session) redirect("/auth/login");
 
-  const [sessionsRes, navsRes] = await Promise.all([
-    lambdaFetch("/sessions"),
-    lambdaFetch("/navigators"),
-  ]);
+const [sessionsRes, meRes] = await Promise.all([
+  lambdaFetch("/sessions"),
+  lambdaFetch("/navigators/me"),
+]);
 
-  const navsBody = navsRes.ok ? await navsRes.json().catch(() => []) : [];
-  const navList: NavProfile[] = Array.isArray(navsBody) ? navsBody : (navsBody.navigators ?? []);
+if (meRes.status === 401) {
+  redirect("/auth/login?returnTo=/dashboard/navigator");
+}
 
-  if (navList.length > 0) {
-    console.log("[navigators] sample full object:", JSON.stringify(navList[0], null, 2));
-    console.log("[navigators] total:", navList.length);
+let meBody: unknown = null;
+if (meRes.ok) {
+  meBody = await meRes.json().catch(() => null);
+} else {
+  // Fallback when /navigators/me is unavailable or fails
+  const allRes = await lambdaFetch("/navigators");
+  const allBody = await allRes.json().catch(() => []);
+  if (allRes.ok) {
+    const rows = Array.isArray(allBody)
+      ? allBody
+      : ((allBody as { navigators?: unknown[] }).navigators ?? []);
+    meBody =
+      rows.find((row: unknown) => {
+        if (!row || typeof row !== "object") return false;
+        const record = row as Record<string, unknown>;
+        return (
+          record.auth0_user_id === session.user?.sub ||
+          record.userId === session.user?.sub
+        );
+      }) ?? null;
   }
+}
 
-  const myProfile = navList.find((n) => n.auth0_user_id === session.user.sub) ?? null;
+const sessionsBody = sessionsRes.ok ? await sessionsRes.json().catch(() => []) : [];
 
-  // No profile yet — require setup before anything else
-  if (!myProfile) redirect("/dashboard/navigator/profile");
-
-  const sessionsBody = sessionsRes.ok ? await sessionsRes.json().catch(() => null) : null;
-
-  const [sessionsBody, navsBody, meBody] = await Promise.all([
-    sessionsRes.json().catch(() => []),
-    navsRes.json().catch(() => []),
-    meRes.json().catch(() => null),
-  ]);
+  const sessionsBody = await sessionsRes.json().catch(() => []);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [sessionsBody, navsBody, myProfile]: [any, any, NavProfile] = await Promise.all([
@@ -155,23 +168,43 @@ export default async function NavigatorDashboardPage() {
   const allSessions: RealSession[] = sessionsRes.ok
     ? Array.isArray(sessionsBody) ? sessionsBody : (sessionsBody.sessions ?? [])
     : [];
-  const navigators: NavProfile[] = navsRes.ok
-    ? Array.isArray(navsBody) ? navsBody : (navsBody.navigators ?? [])
-    : [];
-  const myProfile = (
-    meBody &&
-    typeof meBody === "object" &&
-    (meBody.profile ?? meBody.navigator ?? meBody)
-  ) as NavigatorProfile | null;
+  const myProfile = normalizeNavigatorFromLambda(
+    meBody,
+    session.user?.name ?? null,
+    session.user?.sub ?? null
+  );
+  console.log("[nav-dash] meRes", meRes.status, "profile?", !!myProfile, "sub", session.user?.sub);
 
-  if (!myProfile || !isProfileComplete(myProfile)) {
+  if (!myProfile) {
+    console.log("[nav-dash] no profile after normalization; redirecting to profile");
     redirect("/dashboard/navigator/profile");
   }
+  const profileForGate: NavigatorProfile = {
+    ...myProfile,
+    name:
+      (
+        myProfile.name?.trim() ||
+        session.user?.name?.trim() ||
+        myProfile.nav_group?.trim() ||
+        session.user?.email?.trim() ||
+        ""
+      ) || null,
+  };
+  if (!isProfileComplete(profileForGate)) {
+    console.log("[nav-dash] profile incomplete", {
+      hasName: !!(profileForGate.name?.trim() ?? ""),
+      languages: profileForGate.languages?.length ?? 0,
+      specialties: profileForGate.specialties?.length ?? 0,
+      hasGroup: !!(profileForGate.nav_group?.trim() ?? ""),
+    });
+    redirect("/dashboard/navigator/profile");
+  }
+  const myProfileDisplay = profileForGate;
 
   const byRecent = (a: RealSession, b: RealSession) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
 
-  const mySessions = allSessions.filter((s) => s.navigator_id === myProfile.id);
+  const mySessions = allSessions.filter((s) => s.navigator_id === myProfileDisplay.id);
   const unassigned = allSessions.filter((s) => s.navigator_id === null).sort(byRecent);
   const active = mySessions.filter((s) => s.status !== "closed").sort(byRecent);
   const closed = mySessions.filter((s) => s.status === "closed").sort(byRecent);
@@ -189,8 +222,16 @@ export default async function NavigatorDashboardPage() {
           <Link href="/" aria-label="Home" className="p-1 -ml-1 text-gray-500 hover:text-gray-800 transition">
             <Home size={18} />
           </Link>
-          <span className="text-sm text-gray-500">{displayName}</span>
-          <Link href="/dashboard/navigator/profile" className="text-xs font-medium text-gray-500 hover:text-gray-800 transition ml-2">
+          <span className="text-sm text-gray-500">
+            {myProfileDisplay.nav_group ||
+              myProfileDisplay.name ||
+              session.user.name ||
+              session.user.email}
+          </span>
+          <Link
+            href="/dashboard/navigator/profile"
+            className="text-xs font-medium text-gray-500 hover:text-gray-800 transition ml-2"
+          >
             Edit profile
           </Link>
           <a href="https://www.google.com" className="ml-auto flex items-center gap-1.5 text-brand-exit text-xs font-medium uppercase tracking-wide">
