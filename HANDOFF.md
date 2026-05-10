@@ -364,11 +364,13 @@ Additional flags on closed sessions:
 
 ### 6.4 Initial message load is slow (~3-10 seconds)
 
-**Description:** When a navigator or supervisor first opens a session, messages take ~10 seconds to appear.
+**Description:** When a navigator or supervisor opens a session for the first time in a browser session, messages take ~10 seconds to appear.
 
 **Root cause:** The Lambda → Matrix message fetch is slow on cold start or for large rooms.
 
-**Not a frontend issue.** No frontend fix is possible without backend changes (e.g., caching recent messages in DB, pagination).
+**Frontend mitigation (implemented):** Messages are cached in `localStorage` under `sl_messages_{sessionId}`. On subsequent opens of the same session, cached messages render instantly while the poll runs in the background to fetch any new ones. Only affects the very first open on a fresh browser — after that, the cache makes it feel instant.
+
+**Remaining fix needed:** Backend — cache recent messages in the DB so the Lambda fetch doesn't need to hit Matrix cold every time.
 
 ---
 
@@ -399,7 +401,7 @@ Additional flags on closed sessions:
 ### Fragile areas
 
 - `OverdueFlair` depends on `localStorage` key `sl_nav_responded_{sessionId}`. If the key is absent (e.g., navigator used a different browser), the session will incorrectly show as overdue.
-- Message deduplication uses a `seenEventIds` ref — this is reset on page reload, so messages can briefly re-appear and then be deduplicated on next poll.
+- Message deduplication uses a `seenEventIds` ref. On page load this is seeded from the localStorage cache, so previously-seen messages won't re-appear. However if the cache is cleared, all messages will re-fetch and deduplicate correctly on the first poll.
 
 ---
 
@@ -484,7 +486,15 @@ Navigators have a single "Close & Submit for Review" action. There is no way to 
 
 ### Optimistic messages
 
-When a navigator sends a message, an optimistic entry is immediately added to the message list with `pending: true` and 50% opacity. On the next poll, if a matching confirmed message arrives from Matrix (same role + content), the optimistic entry is removed. If the send fails, the optimistic entry is removed and an error is shown.
+When a navigator sends a message, an optimistic entry is immediately added to the message list with `pending: true` and 50% opacity. On the next poll, if a matching confirmed message arrives from Matrix (same role + content), the optimistic entry is removed and replaced. If the send fails, the optimistic entry is removed and an error is shown. Pending messages are never written to the localStorage cache.
+
+### Message ordering
+
+Messages are sorted by timestamp on every poll merge. This prevents out-of-order display when messages sent in rapid succession are confirmed by Matrix in a different order than they were sent.
+
+### Message cache (localStorage)
+
+Chat messages are cached in `localStorage` under the key `sl_messages_{sessionId}`. On page load, the cache is read synchronously and used to populate the message list before any network request fires — eliminating the blank-screen delay on re-opening a session. The `seenEventIds` set is also seeded from the cache so already-seen messages aren't re-appended on the first poll.
 
 ### `OverdueFlair` depends on localStorage
 

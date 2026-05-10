@@ -144,9 +144,19 @@ export default function SupervisorSessionDetailPage() {
   const [returnTransferTarget, setReturnTransferTarget] = useState("");
 
   // Chat transcript
-  const [messages, setMessages] = useState<LocalMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const seenEventIds = useRef<Set<string>>(new Set());
+
+  const [messages, setMessages] = useState<LocalMessage[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const cached = localStorage.getItem(`sl_messages_${sessionId}`);
+      if (!cached) return [];
+      const msgs: LocalMessage[] = JSON.parse(cached);
+      msgs.forEach((m) => seenEventIds.current.add(m.id));
+      return msgs;
+    } catch { return []; }
+  });
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Resizable split panel
@@ -170,6 +180,11 @@ export default function SupervisorSessionDetailPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (messages.length === 0) return;
+    localStorage.setItem(`sl_messages_${sessionId}`, JSON.stringify(messages));
+  }, [messages, sessionId]);
 
   useEffect(() => {
     async function load() {
@@ -213,18 +228,22 @@ export default function SupervisorSessionDetailPage() {
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
     const poll = () => {
-      fetch(`/api/sessions/${sessionId}/messages`)
+      fetch(`/api/sessions/${sessionId}/messages`, { signal: controller.signal })
         .then((r) => r.json())
         .then((d) => appendMessages(d.messages ?? []))
-        .catch(console.error);
+        .catch((e) => { if (e.name !== "AbortError") console.error(e); });
     };
     poll();
     // Active sessions poll live; closed sessions only need one fetch
     if (session?.status !== "closed") {
       pollRef.current = setInterval(poll, POLL_MS);
     }
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      controller.abort();
+    };
   }, [sessionId, appendMessages, session?.status]);
 
   const handleApprove = async () => {

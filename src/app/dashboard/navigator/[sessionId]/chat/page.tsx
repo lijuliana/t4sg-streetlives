@@ -51,7 +51,6 @@ export default function NavigatorChatPage() {
   const router = useRouter();
 
   const [session, setSession] = useState<RealSession | null>(null);
-  const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -61,9 +60,26 @@ export default function NavigatorChatPage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const seenEventIds = useRef<Set<string>>(new Set());
 
+  const [messages, setMessages] = useState<LocalMessage[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const cached = localStorage.getItem(`sl_messages_${sessionId}`);
+      if (!cached) return [];
+      const msgs: LocalMessage[] = JSON.parse(cached);
+      msgs.forEach((m) => seenEventIds.current.add(m.id));
+      return msgs;
+    } catch { return []; }
+  });
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    const toCache = messages.filter((m) => !m.pending);
+    if (toCache.length === 0) return;
+    localStorage.setItem(`sl_messages_${sessionId}`, JSON.stringify(toCache));
+  }, [messages, sessionId]);
 
   // Fetch session info once on mount
   useEffect(() => {
@@ -101,11 +117,12 @@ export default function NavigatorChatPage() {
 
   // Poll messages
   useEffect(() => {
+    const controller = new AbortController();
     const poll = () => {
-      fetch(`/api/sessions/${sessionId}/messages`)
+      fetch(`/api/sessions/${sessionId}/messages`, { signal: controller.signal })
         .then((r) => r.json())
         .then((data) => appendMessages(data.messages ?? []))
-        .catch(console.error);
+        .catch((e) => { if (e.name !== "AbortError") console.error(e); });
     };
     poll();
     if (session?.status !== "closed") {
@@ -113,6 +130,7 @@ export default function NavigatorChatPage() {
     }
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      controller.abort();
     };
   }, [sessionId, appendMessages, session?.status]);
 
