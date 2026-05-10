@@ -4,13 +4,11 @@
  * Loaded automatically when NODE_ENV=development or SEED_NAVIGATORS=true.
  *
  * Pool design:
- *   - 3 general-intake navigators (eligible for initial session assignment)
- *     covering English, Spanish, and Mandarin
- *   - 3 specialist navigators (available for transfer but not initial assignment)
- *   - Varied nav_groups (stored for future routing; not a current filter)
- *   - Varied capacity and status to exercise load balancing
- *
- * All navigators are assumed cross-trained on all need categories.
+ *   - 3 navigators with English/Spanish/Mandarin coverage
+ *   - 3 navigators with specialist expertise (specific need categories)
+ *   - Varied navGroups, capacity, and status to exercise load balancing
+ *   - All navigators must have an availabilitySchedule set; navigators without one
+ *     are treated as incomplete profiles and excluded from routing.
  */
 
 import { navigatorStore } from "../services/navigatorStore.js";
@@ -29,14 +27,12 @@ export function seedNavigators(): void {
   };
 
   const profiles: CreateNavigatorProfileRequest[] = [
-    // ── General-intake navigators (eligible for initial assignment) ───────────
-
     {
       userId: "@intake-alice:matrix.example.org",
       firstName: "Alice",
       lastName: "Reyes",
       navGroup: "HOUSING_WORKS" as const,
-      expertiseTags: ["intake", "general", "housing", "benefits", "health"],
+      expertiseTags: ["Accommodations", "Health", "Family Services", "Connection"],
       languages: ["en", "es"],
       capacity: 6,
       status: "available" as const,
@@ -48,7 +44,7 @@ export function seedNavigators(): void {
       firstName: "Bob",
       lastName: "Chen",
       navGroup: "DYCD" as const,
-      expertiseTags: ["intake", "general", "employment", "youth_services", "education"],
+      expertiseTags: ["Work", "Legal", "Food", "Clothing"],
       languages: ["en"],
       capacity: 8,
       status: "available" as const,
@@ -66,7 +62,7 @@ export function seedNavigators(): void {
       firstName: "Carol",
       lastName: "Park",
       navGroup: "CUNY_PIN" as const,
-      expertiseTags: ["intake", "general", "education", "youth_services", "benefits"],
+      expertiseTags: ["Personal Care", "Family Services", "Health", "Connection"],
       languages: ["en", "zh"],
       capacity: 5,
       status: "available" as const,
@@ -81,14 +77,12 @@ export function seedNavigators(): void {
       },
     },
 
-    // ── Specialist navigators (transfer targets only) ─────────────────────────
-
     {
       userId: "@specialist-diana:matrix.example.org",
       firstName: "Diana",
       lastName: "Okafor",
       navGroup: "HOUSING_WORKS" as const,
-      expertiseTags: ["housing", "emergency_housing", "shelter", "eviction_prevention"],
+      expertiseTags: ["Accommodations", "Legal", "Family Services"],
       languages: ["en", "es"],
       capacity: 4,
       status: "available" as const,
@@ -100,7 +94,7 @@ export function seedNavigators(): void {
       firstName: "Eve",
       lastName: "Huang",
       navGroup: "DYCD" as const,
-      expertiseTags: ["employment", "job_training", "resume", "workforce_development"],
+      expertiseTags: ["Work", "Legal", "Connection"],
       languages: ["en", "zh"],
       capacity: 5,
       status: "away" as const,
@@ -112,7 +106,7 @@ export function seedNavigators(): void {
       firstName: "Frank",
       lastName: "Santos",
       navGroup: "CUNY_PIN" as const,
-      expertiseTags: ["education", "college_access", "financial_aid", "transfer_credits"],
+      expertiseTags: ["Food", "Clothing", "Personal Care"],
       languages: ["en"],
       capacity: 5,
       status: "offline" as const,

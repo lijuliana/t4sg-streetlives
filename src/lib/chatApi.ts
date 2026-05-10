@@ -1,11 +1,16 @@
-const API = process.env.NEXT_PUBLIC_API_URL;
+// All guest session calls go through Next.js API routes so they are logged
+// server-side and appear in the `next dev` terminal.
+const GUEST = "/api/guest/sessions";
 
+// Field names match the Lambda POST /sessions response (camelCase).
+// The GET proxy normalises the snake_case GET response to this same shape.
 export interface Session {
   sessionId: string;
   sessionUserToken: string;
   status: "unassigned" | "active" | "closed" | "transferred";
   needCategory: string;
   assignedNavigatorId: string | null;
+  assignedNavigatorName: string | null;
   routingFailReason: string | null;
 }
 
@@ -19,10 +24,10 @@ export async function createSession(
   needCategory: string,
   language: string | null
 ): Promise<Session> {
-  const res = await fetch(`${API}/sessions`, {
+  const res = await fetch(GUEST, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ need_category: needCategory, language }),
+    body: JSON.stringify({ needCategory, language }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -35,7 +40,7 @@ export async function getSession(
   sessionId: string,
   token: string
 ): Promise<Session> {
-  const res = await fetch(`${API}/sessions/${sessionId}?token=${token}`);
+  const res = await fetch(`${GUEST}/${sessionId}?token=${token}`);
   if (!res.ok) throw new Error(`Failed to get session (${res.status})`);
   return res.json();
 }
@@ -45,7 +50,7 @@ export async function sendMessage(
   token: string,
   body: string
 ): Promise<void> {
-  const res = await fetch(`${API}/sessions/${sessionId}/messages`, {
+  const res = await fetch(`${GUEST}/${sessionId}/messages`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token, body }),
@@ -60,9 +65,7 @@ export async function fetchMessages(
   sessionId: string,
   token: string
 ): Promise<Message[]> {
-  const res = await fetch(
-    `${API}/sessions/${sessionId}/messages?token=${token}`
-  );
+  const res = await fetch(`${GUEST}/${sessionId}/messages?token=${token}`);
   if (!res.ok) throw new Error(`Failed to fetch messages (${res.status})`);
   const data = await res.json();
   return data.messages ?? [];

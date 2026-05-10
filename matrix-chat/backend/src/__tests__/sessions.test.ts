@@ -21,6 +21,16 @@ const makeNav = (overrides: Partial<NavigatorProfile>): NavigatorProfile => ({
   capacity: 5,
   status: "available",
   isGeneralIntake: true,
+  // Full-week schedule so tests aren't gated by time-of-day unless they explicitly override.
+  availabilitySchedule: {
+    Mon: { start: "00:00", end: "24:00" },
+    Tue: { start: "00:00", end: "24:00" },
+    Wed: { start: "00:00", end: "24:00" },
+    Thu: { start: "00:00", end: "24:00" },
+    Fri: { start: "00:00", end: "24:00" },
+    Sat: { start: "00:00", end: "24:00" },
+    Sun: { start: "00:00", end: "24:00" },
+  },
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   ...overrides,
@@ -33,7 +43,7 @@ const noLoad = () => 0;
 describe("session creation status", () => {
   it("session becomes active when a general-intake navigator is available", () => {
     const navs = [makeNav({ isGeneralIntake: true, status: "available" })];
-    const outcome = assignNavigator({ needCategory: "housing" }, navs, noLoad, "initial");
+    const outcome = assignNavigator({ needCategory: "accommodations" }, navs, noLoad, "initial");
     expect(outcome.assigned).toBe(true);
     const status = outcome.assigned ? "active" : "unassigned";
     expect(status).toBe("active");
@@ -42,7 +52,7 @@ describe("session creation status", () => {
   it("session becomes active even when navigator has isGeneralIntake=false (gate removed)", () => {
     // isGeneralIntake no longer restricts routing; any available navigator is eligible
     const navs = [makeNav({ isGeneralIntake: false, status: "available" })];
-    const outcome = assignNavigator({ needCategory: "housing" }, navs, noLoad, "initial");
+    const outcome = assignNavigator({ needCategory: "accommodations" }, navs, noLoad, "initial");
     expect(outcome.assigned).toBe(true);
     const status = outcome.assigned ? "active" : "unassigned";
     expect(status).toBe("active");
@@ -51,7 +61,7 @@ describe("session creation status", () => {
   it("session becomes unassigned when language is unmatched", () => {
     const navs = [makeNav({ languages: ["en"], isGeneralIntake: true, status: "available" })];
     const outcome = assignNavigator(
-      { needCategory: "housing", language: "fr" },
+      { needCategory: "accommodations", language: "fr" },
       navs,
       noLoad,
       "initial",
@@ -66,9 +76,9 @@ describe("session creation status", () => {
   });
 
   it("need_category does not block assignment (all navigators cross-trained)", () => {
-    // A navigator with navGroup DYCD can be assigned to a housing session
+    // A navigator with navGroup DYCD can be assigned to an accommodations session
     const navs = [makeNav({ navGroup: "DYCD", isGeneralIntake: true, status: "available" })];
-    const outcome = assignNavigator({ needCategory: "housing" }, navs, noLoad, "initial");
+    const outcome = assignNavigator({ needCategory: "accommodations" }, navs, noLoad, "initial");
     expect(outcome.assigned).toBe(true);
   });
 });
@@ -83,7 +93,7 @@ describe("transfer guards", () => {
 
   it("transfer routing uses transfer mode (any navigator eligible)", () => {
     const specialist = makeNav({ id: "spec-1", isGeneralIntake: false, status: "available" });
-    const outcome = assignNavigator({ needCategory: "housing" }, [specialist], noLoad, "transfer");
+    const outcome = assignNavigator({ needCategory: "accommodations" }, [specialist], noLoad, "transfer");
     expect(outcome.assigned).toBe(true);
   });
 
@@ -113,7 +123,7 @@ describe("transfer guards", () => {
   });
 
   it("returns unassigned when no navigators exist for transfer", () => {
-    const outcome = assignNavigator({ needCategory: "housing" }, [], noLoad, "transfer");
+    const outcome = assignNavigator({ needCategory: "accommodations" }, [], noLoad, "transfer");
     expect(outcome.assigned).toBe(false);
   });
 });
@@ -179,8 +189,8 @@ const mon10am = new Date(2024, 0, 1, 10, 0);
 
 describe("queue processor", () => {
   it("assigns a queued session when a navigator has capacity", async () => {
-    const sessions = [makeSession({ sessionId: "s1", needCategory: "housing", language: "en" })];
-    const navs = [makeNav({ id: "n1", expertiseTags: ["housing"], languages: ["en"] })];
+    const sessions = [makeSession({ sessionId: "s1", needCategory: "accommodations", language: "en" })];
+    const navs = [makeNav({ id: "n1", expertiseTags: ["Accommodations"], languages: ["en"] })];
     const deps = makeDeps(sessions, navs);
 
     const count = await processQueue(deps);
