@@ -31,6 +31,12 @@ interface NavProfile {
   auth0_user_id: string;
   nav_group: string;
   status: string;
+  first_name: string;
+  last_name: string;
+}
+
+function navFullName(n: NavProfile): string {
+  return `${n.first_name ?? ""} ${n.last_name ?? ""}`.trim() || n.nav_group || n.auth0_user_id;
 }
 
 interface SessionEvent {
@@ -57,7 +63,7 @@ function resolveActorName(actorId: string, navList: NavProfile[]): string {
   if (actorId === "system") return "System";
   if (actorId === "user" || actorId.endsWith("@clients")) return "User";
   const nav = navList.find((n) => n.auth0_user_id === actorId || n.id === actorId);
-  return nav ? (nav.nav_group || actorId) : "Supervisor";
+  return nav ? navFullName(nav) : "Supervisor";
 }
 
 const EVENT_LABELS: Record<SessionEvent["event_type"], string> = {
@@ -314,7 +320,7 @@ export default function SupervisorSessionDetailPage() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-gray-900 capitalize">{categoryLabel}</p>
           <p className="text-xs text-gray-400">
-            {isClosed ? "Closed" : session.approved ? "Approved" : isNeedsReview ? "Needs Review" : "Active"} · {nav?.nav_group ?? "Unassigned"}
+            {isClosed ? "Closed" : session.approved ? "Approved" : isNeedsReview ? "Needs Review" : "Active"} · {nav ? navFullName(nav) : "Unassigned"}
           </p>
         </div>
         <span className={cn(
@@ -340,7 +346,7 @@ export default function SupervisorSessionDetailPage() {
           <div className="space-y-1 text-sm text-gray-600">
             <p><span className="text-gray-400">Category:</span> <span className="capitalize">{categoryLabel}</span></p>
             {session.language && <p><span className="text-gray-400">Language:</span> {session.language.toUpperCase()}</p>}
-            <p><span className="text-gray-400">Navigator:</span> {nav?.nav_group ?? "Unassigned"}</p>
+            <p><span className="text-gray-400">Navigator:</span> {nav ? navFullName(nav) : "Unassigned"}</p>
             <p><span className="text-gray-400">Started:</span> {moment(session.created_at).format("MMM D, YYYY [at] h:mm A")}</p>
             {session.closed_at && (
               <p><span className="text-gray-400">Closed:</span> {moment(session.closed_at).format("MMM D, YYYY [at] h:mm A")}</p>
@@ -409,7 +415,7 @@ export default function SupervisorSessionDetailPage() {
                 {navigators
                   .filter((n) => n.id !== session.navigator_id && n.status === "available")
                   .map((n) => (
-                    <option key={n.id} value={n.id}>{n.nav_group}</option>
+                    <option key={n.id} value={n.id}>{navFullName(n)}</option>
                   ))}
               </select>
               <button
@@ -449,7 +455,7 @@ export default function SupervisorSessionDetailPage() {
                   {navigators
                     .filter((n) => n.id !== session.navigator_id && n.status === "available")
                     .map((n) => (
-                      <option key={n.id} value={n.id}>{n.nav_group}</option>
+                      <option key={n.id} value={n.id}>{navFullName(n)}</option>
                     ))}
                 </select>
               </div>

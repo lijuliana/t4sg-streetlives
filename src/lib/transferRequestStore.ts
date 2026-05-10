@@ -18,6 +18,10 @@ export function markTransferRequested(sessionId: string): void {
   globalThis.__slTransferRequested!.add(sessionId);
 }
 
+export function clearTransferRequested(sessionId: string): void {
+  globalThis.__slTransferRequested!.delete(sessionId);
+}
+
 export function isTransferRequested(sessionId: string): boolean {
   return globalThis.__slTransferRequested!.has(sessionId);
 }

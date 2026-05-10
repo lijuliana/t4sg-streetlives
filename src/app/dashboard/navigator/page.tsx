@@ -104,39 +104,11 @@ export default async function NavigatorDashboardPage() {
   const navsBody = navsRes.ok ? await navsRes.json().catch(() => []) : [];
   const navList: NavProfile[] = Array.isArray(navsBody) ? navsBody : (navsBody.navigators ?? []);
 
-  if (navList.length > 0) {
-    console.log("[navigators] sample full object:", JSON.stringify(navList[0], null, 2));
-    console.log("[navigators] total:", navList.length);
-  }
-
   const myProfile = navList.find((n) => n.auth0_user_id === session.user.sub) ?? null;
-
-  // No profile yet — require setup before anything else
   if (!myProfile) redirect("/dashboard/navigator/profile");
 
   const sessionsBody = sessionsRes.ok ? await sessionsRes.json().catch(() => null) : null;
-
-  const [sessionsBody, navsBody, meBody] = await Promise.all([
-    sessionsRes.json().catch(() => []),
-    navsRes.json().catch(() => []),
-    meRes.json().catch(() => null),
-  ]);
-
-  const allSessions: RealSession[] = sessionsRes.ok
-    ? Array.isArray(sessionsBody) ? sessionsBody : (sessionsBody.sessions ?? [])
-    : [];
-  const navigators: NavProfile[] = navsRes.ok
-    ? Array.isArray(navsBody) ? navsBody : (navsBody.navigators ?? [])
-    : [];
-  const myProfile = (
-    meBody &&
-    typeof meBody === "object" &&
-    (meBody.profile ?? meBody.navigator ?? meBody)
-  ) as NavigatorProfile | null;
-
-  if (!myProfile || !isProfileComplete(myProfile)) {
-    redirect("/dashboard/navigator/profile");
-  }
+  const allSessions: RealSession[] = Array.isArray(sessionsBody) ? sessionsBody : (sessionsBody?.sessions ?? []);
 
   const byRecent = (a: RealSession, b: RealSession) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
