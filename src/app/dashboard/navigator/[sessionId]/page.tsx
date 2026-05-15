@@ -4,9 +4,27 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import Image from "next/image";
 import { ArrowLeft, Send, Circle, UserPlus, ArrowRight, CheckCircle, Home } from "lucide-react";
 import moment from "moment";
 import { cn } from "@/lib/utils";
+
+const CATEGORY_ICONS: Record<string, string> = {
+  housing:        "/new-icons/house.svg",
+  accommodations: "/new-icons/house.svg",
+  health:         "/new-icons/heart-chart.svg",
+  benefits:       "/new-icons/checklist.svg",
+  work:           "/new-icons/checklist.svg",
+  legal:          "/new-icons/scales.svg",
+  food:           "/new-icons/store.svg",
+  clothing:       "/new-icons/bag.svg",
+  personal_care:  "/new-icons/umbrella.svg",
+  family_services:"/new-icons/person.svg",
+  youth_services: "/new-icons/person.svg",
+  connection:     "/new-icons/wifi.svg",
+  education:      "/new-icons/checklist.svg",
+  other:          "/new-icons/chat.svg",
+};
 import { isProfileComplete } from "@/lib/store";
 import type { NavigatorProfile } from "@/lib/store";
 
@@ -15,7 +33,7 @@ const OUTCOME_OPTIONS = [
   "Information Only",
 ];
 
-const POLL_MS = 3000;
+const POLL_MS = 7000;
 
 interface Session {
   id: string;
@@ -134,16 +152,27 @@ export default function NavigatorSessionDetailPage() {
   // Close flow
   const [showClosePanel, setShowClosePanel] = useState(false);
   const [selectedOutcomes, setSelectedOutcomes] = useState<string[]>([]);
+  const [closeReason, setCloseReason] = useState("");
   const [closing, setClosing] = useState(false);
 
   // Chat
-  const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const seenEventIds = useRef<Set<string>>(new Set());
+
+  const [messages, setMessages] = useState<LocalMessage[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const cached = localStorage.getItem(`sl_messages_${sessionId}`);
+      if (!cached) return [];
+      const msgs: LocalMessage[] = JSON.parse(cached);
+      msgs.forEach((m) => seenEventIds.current.add(m.id));
+      return msgs;
+    } catch { return []; }
+  });
 
   // Resizable split panel
   const containerRef = useRef<HTMLDivElement>(null);
@@ -166,6 +195,11 @@ export default function NavigatorSessionDetailPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (messages.length === 0) return;
+    localStorage.setItem(`sl_messages_${sessionId}`, JSON.stringify(messages));
+  }, [messages, sessionId]);
 
   // Load session, navigators, events, and current user's profile on mount
   useEffect(() => {
@@ -217,20 +251,36 @@ export default function NavigatorSessionDetailPage() {
         timestamp: new Date(m.timestamp).toISOString(),
       });
     }
-    if (newMsgs.length > 0) setMessages((prev) => [...prev, ...newMsgs]);
+    if (newMsgs.length > 0) {
+      setMessages((prev) => {
+        const confirmedContents = new Set(newMsgs.map((m) => `${m.role}:${m.content}`));
+        const pruned = prev.filter(
+          (m) => !m.id.startsWith("optimistic-") || !confirmedContents.has(`${m.role}:${m.content}`)
+        );
+        return [...pruned, ...newMsgs].sort(
+          (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
+      });
+    }
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
     const poll = () => {
-      fetch(`/api/sessions/${sessionId}/messages`)
+      fetch(`/api/sessions/${sessionId}/messages`, { signal: controller.signal })
         .then((r) => r.json())
         .then((d) => appendMessages(d.messages ?? []))
-        .catch(console.error);
+        .catch((e) => { if (e.name !== "AbortError") console.error(e); });
     };
     poll();
-    pollRef.current = setInterval(poll, POLL_MS);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [sessionId, appendMessages]);
+    if (session?.status !== "closed") {
+      pollRef.current = setInterval(poll, POLL_MS);
+    }
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      controller.abort();
+    };
+  }, [sessionId, appendMessages, session?.status]);
 
   const saveNotes = async () => {
     if (!session || notes === (session.notes ?? "")) return;
@@ -276,6 +326,7 @@ export default function NavigatorSessionDetailPage() {
         body: JSON.stringify({
           outcome: selectedOutcomes,
           submitted_for_review: true,
+          ...(closeReason.trim() ? { notes: closeReason.trim() } : {}),
         }),
       });
       toast.success("Session closed and submitted for review");
@@ -291,6 +342,13 @@ export default function NavigatorSessionDetailPage() {
     if (!text || session?.status === "closed") return;
     setInputValue("");
     setSendError(null);
+    const optimisticId = `optimistic-${Date.now()}`;
+    setMessages((prev) => [...prev, {
+      id: optimisticId,
+      role: "navigator",
+      content: text,
+      timestamp: new Date().toISOString(),
+    }]);
     try {
       const res = await fetch(`/api/sessions/${sessionId}/navigator-messages`, {
         method: "POST",
@@ -300,11 +358,13 @@ export default function NavigatorSessionDetailPage() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         setSendError(err.error ?? "Failed to send");
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
       } else {
         localStorage.setItem(`sl_nav_responded_${sessionId}`, Date.now().toString());
       }
     } catch {
       setSendError("Network error");
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
     }
     setTimeout(() => inputRef.current?.focus(), 50);
   };
@@ -328,7 +388,7 @@ export default function NavigatorSessionDetailPage() {
   const isClosed = session.status === "closed";
   const isMySession = myProfile !== null;
   const profileComplete = myFullProfile ? isProfileComplete(myFullProfile) : true;
-const categoryLabel = session.need_category.replace(/_/g, " ");
+  const categoryLabel = session.need_category.replace(/_/g, " ");
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -345,6 +405,9 @@ const categoryLabel = session.need_category.replace(/_/g, " ");
         >
           <ArrowLeft size={20} strokeWidth={2} />
         </button>
+        <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center flex-shrink-0">
+          <Image src={CATEGORY_ICONS[session.need_category] ?? "/new-icons/chat.svg"} alt="" width={18} height={18} aria-hidden />
+        </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-gray-900 capitalize">{categoryLabel}</p>
           <p className="text-xs text-gray-400">
@@ -490,6 +553,17 @@ const categoryLabel = session.need_category.replace(/_/g, " ");
                     </label>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-500">Reason <span className="text-gray-400">(optional)</span></label>
+                <textarea
+                  value={closeReason}
+                  onChange={(e) => setCloseReason(e.target.value)}
+                  placeholder="Add any notes about why this session is closing…"
+                  rows={2}
+                  className="mt-1 w-full text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-gray-300"
+                />
               </div>
 
               <div className="flex gap-2">

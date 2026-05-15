@@ -6,7 +6,7 @@ import { ArrowLeft, Send, X } from "lucide-react";
 import moment from "moment";
 import { cn } from "@/lib/utils";
 
-const POLL_MS = 3000;
+const POLL_MS = 7000;
 
 interface RealSession {
   id: string;
@@ -51,7 +51,6 @@ export default function NavigatorChatPage() {
   const router = useRouter();
 
   const [session, setSession] = useState<RealSession | null>(null);
-  const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -61,9 +60,26 @@ export default function NavigatorChatPage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const seenEventIds = useRef<Set<string>>(new Set());
 
+  const [messages, setMessages] = useState<LocalMessage[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const cached = localStorage.getItem(`sl_messages_${sessionId}`);
+      if (!cached) return [];
+      const msgs: LocalMessage[] = JSON.parse(cached);
+      msgs.forEach((m) => seenEventIds.current.add(m.id));
+      return msgs;
+    } catch { return []; }
+  });
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    const toCache = messages.filter((m) => !m.pending);
+    if (toCache.length === 0) return;
+    localStorage.setItem(`sl_messages_${sessionId}`, JSON.stringify(toCache));
+  }, [messages, sessionId]);
 
   // Fetch session info once on mount
   useEffect(() => {
@@ -86,23 +102,37 @@ export default function NavigatorChatPage() {
         timestamp: new Date(m.timestamp).toISOString(),
       });
     }
-    if (newMsgs.length > 0) setMessages((prev) => [...prev, ...newMsgs]);
+    if (newMsgs.length > 0) {
+      setMessages((prev) => {
+        const confirmedContents = new Set(newMsgs.map((m) => `${m.role}:${m.content}`));
+        const pruned = prev.filter(
+          (m) => !m.id.startsWith("optimistic-") || !confirmedContents.has(`${m.role}:${m.content}`)
+        );
+        return [...pruned, ...newMsgs].sort(
+          (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
+      });
+    }
   }, []);
 
   // Poll messages
   useEffect(() => {
+    const controller = new AbortController();
     const poll = () => {
-      fetch(`/api/sessions/${sessionId}/messages`)
+      fetch(`/api/sessions/${sessionId}/messages`, { signal: controller.signal })
         .then((r) => r.json())
         .then((data) => appendMessages(data.messages ?? []))
-        .catch(console.error);
+        .catch((e) => { if (e.name !== "AbortError") console.error(e); });
     };
-    poll(); // immediate first fetch
-    pollRef.current = setInterval(poll, POLL_MS);
+    poll();
+    if (session?.status !== "closed") {
+      pollRef.current = setInterval(poll, POLL_MS);
+    }
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      controller.abort();
     };
-  }, [sessionId, appendMessages]);
+  }, [sessionId, appendMessages, session?.status]);
 
   const isReadOnly = session?.status === "closed";
 
@@ -111,13 +141,14 @@ export default function NavigatorChatPage() {
     if (!text || isReadOnly) return;
     setInputValue("");
     setSendError(null);
-
-    const pendingId = `pending-${Date.now()}`;
-    setMessages((prev) => [
-      ...prev,
-      { id: pendingId, role: "navigator", content: text, timestamp: new Date().toISOString(), pending: true },
-    ]);
-
+    const optimisticId = `optimistic-${Date.now()}`;
+    setMessages((prev) => [...prev, {
+      id: optimisticId,
+      role: "navigator",
+      content: text,
+      timestamp: new Date().toISOString(),
+      pending: true,
+    }]);
     try {
       const res = await fetch(`/api/sessions/${sessionId}/navigator-messages`, {
         method: "POST",
@@ -127,15 +158,15 @@ export default function NavigatorChatPage() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         setSendError(err.error ?? "Failed to send");
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
       } else {
         localStorage.setItem(`sl_nav_responded_${sessionId}`, Date.now().toString());
       }
     } catch {
       setSendError("Network error");
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
     }
 
-    // Remove the optimistic copy — the confirmed message arrives on the next poll.
-    setMessages((prev) => prev.filter((m) => m.id !== pendingId));
     setTimeout(() => inputRef.current?.focus(), 50);
   };
 

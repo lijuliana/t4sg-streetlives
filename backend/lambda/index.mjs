@@ -24,6 +24,7 @@
  *   Navigator profiles (Auth0 JWT required):
  *     GET    /navigators                        — list navigators
  *     POST   /navigators                        — create navigator profile
+ *     GET    /navigators/me                     — current navigator by Auth0 sub
  *     GET    /navigators/:id                    — get navigator profile
  *     PATCH  /navigators/:id                    — update navigator profile
  *
@@ -542,18 +543,31 @@ async function listNavigators() {
 
 // POST /navigators
 async function createNavigator(body) {
-  const { auth0_user_id, nav_group, expertise_tags, languages, capacity, status, is_general_intake } = body;
+  const {
+    auth0_user_id,
+    nav_group,
+    expertise_tags,
+    specialties,
+    languages,
+    capacity,
+    status,
+    is_general_intake,
+  } = body;
   if (!auth0_user_id || !nav_group || capacity == null) {
     return respond(400, { error: "auth0_user_id, nav_group, and capacity are required" });
   }
+  const tags = expertise_tags ?? specialties ?? [];
   const result = await pool.query(
     `INSERT INTO navigator_profiles
        (auth0_user_id, nav_group, expertise_tags, languages, capacity, status, is_general_intake)
      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
     [
-      auth0_user_id, nav_group,
-      expertise_tags ?? [], languages ?? ["en"],
-      capacity, status ?? "offline",
+      auth0_user_id,
+      nav_group,
+      tags,
+      languages ?? ["en"],
+      capacity,
+      status ?? "offline",
       is_general_intake ?? false,
     ]
   );
@@ -569,14 +583,19 @@ async function getNavigator(id) {
 
 // PATCH /navigators/:id
 async function updateNavigator(id, body) {
+  const b = { ...body };
+  if (b.specialties !== undefined) {
+    b.expertise_tags = b.specialties;
+    delete b.specialties;
+  }
   const fields = ["nav_group","expertise_tags","languages","capacity","status","is_general_intake","first_name","last_name"];
   const updates = [];
   const values = [];
   let i = 1;
   for (const f of fields) {
-    if (body[f] !== undefined) {
+    if (b[f] !== undefined) {
       updates.push(`${f}=$${i++}`);
-      values.push(body[f]);
+      values.push(b[f]);
     }
   }
   if (body.availability_schedule !== undefined) {
@@ -594,6 +613,15 @@ async function updateNavigator(id, body) {
   return respond(200, result.rows[0]);
 }
 
+// GET /navigators/me — row for the Auth0 subject on the JWT
+async function getNavigatorMe(auth0Sub) {
+  const result = await pool.query(
+    "SELECT * FROM navigator_profiles WHERE auth0_user_id = $1",
+    [auth0Sub]
+  );
+  if (result.rows.length === 0) return respond(404, { error: "Profile not found" });
+  return respond(200, result.rows[0]);
+  
 // DELETE /sessions/:id — supervisor only, closed sessions only
 async function deleteSession(sessionId, jwtPayload) {
   const roles = jwtPayload["https://streetlives.app/roles"] ?? [];
@@ -743,6 +771,16 @@ export const handler = async (event) => {
     // POST /navigators
     if (method === "POST" && segments[0] === "navigators" && segments.length === 1) {
       return await createNavigator(body);
+    }
+
+    // GET /navigators/me  (before :id so "me" is not treated as UUID)
+    if (
+      method === "GET" &&
+      segments[0] === "navigators" &&
+      segments.length === 2 &&
+      segments[1] === "me"
+    ) {
+      return await getNavigatorMe(actorSub);
     }
 
     // GET /navigators/:id

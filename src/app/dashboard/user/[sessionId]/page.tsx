@@ -77,7 +77,7 @@ export default function UserSessionTranscriptPage() {
     return (
       <div className="flex flex-col h-screen bg-gray-100">
         <header className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200">
-          <button type="button" onClick={() => router.push("/dashboard/user")} className="p-1 -ml-1 text-gray-500 hover:text-gray-800 transition">
+          <button type="button" onClick={() => router.push("/dashboard/user")} aria-label="Back" className="p-1 -ml-1 text-gray-500 hover:text-gray-800 transition">
             <ArrowLeft size={20} strokeWidth={2} />
           </button>
           <span className="text-sm font-medium text-gray-900">Session Not Found</span>

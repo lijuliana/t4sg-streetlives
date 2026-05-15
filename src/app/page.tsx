@@ -30,8 +30,6 @@ const services = [
 export default async function HomePage() {
   const session = await auth0.getSession();
   const roles: string[] = (session?.user?.[ROLES_CLAIM] as string[]) ?? [];
-  const matchedRole = roles.find((r) => ROLE_DASHBOARD[r] !== undefined) ?? (session ? "user" : null);
-  const dashboard = matchedRole ? ROLE_DASHBOARD[matchedRole] : null;
   const staffDashboardHref = roles.includes("supervisor")
     ? "/dashboard/supervisor"
     : roles.includes("navigator")

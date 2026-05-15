@@ -6,7 +6,7 @@ const ROLES_CLAIM = "https://streetlives.app/roles";
 export const auth0 = new Auth0Client({
   authorizationParameters: {
     audience: process.env.AUTH0_AUDIENCE,
-    scope: "openid profile email",
+    scope: "openid profile email offline_access",
   },
 
   async beforeSessionSaved(session) {
@@ -21,6 +21,10 @@ export const auth0 = new Auth0Client({
 
   async onCallback(error, ctx) {
     const base = ctx.appBaseUrl ?? process.env.APP_BASE_URL!;
+    const returnTo =
+      typeof ctx.returnTo === "string" && ctx.returnTo.startsWith("/")
+        ? ctx.returnTo
+        : "/";
 
     if (error) {
       // Log the real error — previously redirecting to /auth/signin caused an infinite loop
@@ -29,6 +33,6 @@ export const auth0 = new Auth0Client({
       return NextResponse.redirect(new URL("/", base));
     }
 
-    return NextResponse.redirect(new URL("/", base));
+    return NextResponse.redirect(new URL(returnTo, base));
   },
 });

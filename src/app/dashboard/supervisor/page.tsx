@@ -3,8 +3,27 @@ import { lambdaFetch } from "@/lib/lambda";
 import { isTransferRequested } from "@/lib/transferRequestStore";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import moment from "moment";
 import { ChevronDown, Home } from "lucide-react";
+import ShowMoreList from "@/components/ShowMoreList";
+
+const CATEGORY_ICONS: Record<string, string> = {
+  housing:        "/new-icons/house.svg",
+  accommodations: "/new-icons/house.svg",
+  health:         "/new-icons/heart-chart.svg",
+  benefits:       "/new-icons/checklist.svg",
+  work:           "/new-icons/checklist.svg",
+  legal:          "/new-icons/scales.svg",
+  food:           "/new-icons/store.svg",
+  clothing:       "/new-icons/bag.svg",
+  personal_care:  "/new-icons/umbrella.svg",
+  family_services:"/new-icons/person.svg",
+  youth_services: "/new-icons/person.svg",
+  connection:     "/new-icons/wifi.svg",
+  education:      "/new-icons/checklist.svg",
+  other:          "/new-icons/chat.svg",
+};
 import { DashboardPoller } from "@/components/DashboardPoller";
 import { DeleteSessionButton } from "@/components/DeleteSessionButton";
 import { cn } from "@/lib/utils";
@@ -62,6 +81,16 @@ function isInScheduledHours(schedule: AvailabilitySchedule | null | undefined): 
   return cur >= toMins(slot.start) && cur < toMins(slot.end);
 }
 
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: "English", es: "Spanish", fr: "French", zh: "Chinese",
+  ar: "Arabic", pt: "Portuguese", ru: "Russian", ko: "Korean",
+  vi: "Vietnamese", ht: "Haitian Creole", pl: "Polish", it: "Italian",
+};
+
+function languageLabel(code: string): string {
+  return LANGUAGE_NAMES[code.toLowerCase()] ?? code.toUpperCase();
+}
+
 function navDisplayName(nav: NavProfile): string {
   const name = [nav.first_name, nav.last_name].filter(Boolean).join(" ");
   return name || nav.nav_group.replace(/_/g, " ");
@@ -98,10 +127,14 @@ function SessionRow({ session, badge, navigator, deletable }: { session: Session
       href={`/dashboard/supervisor/${session.id}`}
       className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3 hover:border-gray-300 hover:shadow-sm transition"
     >
-      <div className="w-9 h-9 rounded-full bg-brand-yellow flex items-center justify-center flex-shrink-0">
-        <span className="text-xs font-medium text-gray-900">
-          {session.need_category.slice(0, 2).toUpperCase()}
-        </span>
+      <div className="w-9 h-9 rounded-full bg-white border border-gray-200 flex items-center justify-center flex-shrink-0">
+        <Image
+          src={CATEGORY_ICONS[session.need_category] ?? "/new-icons/chat.svg"}
+          alt=""
+          width={20}
+          height={20}
+          aria-hidden
+        />
       </div>
       <div className="flex-1 min-w-0">
         {navigator && (
@@ -122,16 +155,25 @@ function SessionRow({ session, badge, navigator, deletable }: { session: Session
           {badge}
           {session.language && (
             <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-              {session.language.toUpperCase()}
+              {languageLabel(session.language)}
             </span>
           )}
           <span className="text-xs text-gray-400" suppressHydrationWarning>
-            {moment(session.created_at).calendar(null, {
-              sameDay: "[Today at] h:mm A",
-              lastDay: "[Yesterday at] h:mm A",
-              lastWeek: "MMM D [at] h:mm A",
-              sameElse: "MMM D, YYYY [at] h:mm A",
-            })}
+            {session.status === "closed" && session.closed_at ? (
+              <>Closed {moment(session.closed_at).calendar(null, {
+                sameDay: "[today at] h:mm A",
+                lastDay: "[yesterday at] h:mm A",
+                lastWeek: "MMM D [at] h:mm A",
+                sameElse: "MMM D, YYYY [at] h:mm A",
+              })}</>
+            ) : (
+              <>Created {moment(session.created_at).calendar(null, {
+                sameDay: "[today at] h:mm A",
+                lastDay: "[yesterday at] h:mm A",
+                lastWeek: "MMM D [at] h:mm A",
+                sameElse: "MMM D, YYYY [at] h:mm A",
+              })}</>
+            )}
           </span>
         </div>
       </div>
@@ -248,19 +290,22 @@ export default async function SupervisorDashboardPage() {
 
   const navById = new Map(navigators.map((n) => [n.id, n]));
 
-  const byRecent = (a: Session, b: Session) =>
+  const byCreated = (a: Session, b: Session) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+
+  const byClosed = (a: Session, b: Session) =>
+    new Date(b.closed_at ?? b.created_at).getTime() - new Date(a.closed_at ?? a.created_at).getTime();
 
   const needsReview = allSessions
     .filter((s) => s.status === "closed" && s.approved !== true)
-    .sort(byRecent);
+    .sort(byClosed);
 
   const active = allSessions.filter((s) => s.status !== "closed");
   const transferRequested = active.filter((s) => isTransferRequested(s.id)).sort(byRecent);
   const unassigned = allSessions.filter((s) => s.navigator_id === null && s.status !== "closed").sort(byRecent);
   const approvedArchive = allSessions
     .filter((s) => s.approved === true)
-    .sort(byRecent);
+    .sort(byClosed);
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
@@ -329,11 +374,7 @@ export default async function SupervisorDashboardPage() {
                   <span className="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full font-medium">
                     Needs Review
                   </span>
-                ) : (
-                  <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-medium">
-                    User Ended
-                  </span>
-                )}
+                ) : undefined}
               />
             ))
           )}
@@ -423,7 +464,9 @@ export default async function SupervisorDashboardPage() {
                 <p className="text-sm text-gray-400">No approved sessions yet</p>
               </div>
             ) : (
-              approvedArchive.map((s) => <SessionRow key={s.id} session={s} deletable navigator={s.navigator_id ? navById.get(s.navigator_id) : undefined} />)
+              <ShowMoreList>
+                {approvedArchive.map((s) => <SessionRow key={s.id} session={s} />)}
+              </ShowMoreList>
             )}
           </section>
         </div>
