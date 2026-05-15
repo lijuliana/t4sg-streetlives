@@ -201,8 +201,8 @@ export default async function NavigatorDashboardPage() {
             <Home size={18} />
           </Link>
           <span className="text-sm text-gray-500">
-            {myProfileDisplay.nav_group ||
-              `${myProfileDisplay.first_name} ${myProfileDisplay.last_name}`.trim() ||
+            {`${myProfileDisplay.first_name} ${myProfileDisplay.last_name}`.trim() ||
+              myProfileDisplay.nav_group ||
               session.user.name ||
               session.user.email}
           </span>
