@@ -19,11 +19,21 @@ const makeNav = (overrides: Partial<NavigatorProfile>): NavigatorProfile => ({
   id: "nav-1",
   userId: "@test:matrix.example.org",
   navGroup: "HOUSING_WORKS",
-  expertiseTags: ["housing", "employment", "health", "benefits", "youth_services", "education"],
+  expertiseTags: ["Accommodations", "Work", "Health", "Food", "Clothing", "Personal Care", "Family Services", "Legal", "Connection"],
   languages: ["en"],
   capacity: 5,
   status: "available",
   isGeneralIntake: true,
+  // Full-week schedule so tests aren't gated by time-of-day unless they explicitly override.
+  availabilitySchedule: {
+    Mon: { start: "00:00", end: "24:00" },
+    Tue: { start: "00:00", end: "24:00" },
+    Wed: { start: "00:00", end: "24:00" },
+    Thu: { start: "00:00", end: "24:00" },
+    Fri: { start: "00:00", end: "24:00" },
+    Sat: { start: "00:00", end: "24:00" },
+    Sun: { start: "00:00", end: "24:00" },
+  },
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   ...overrides,
@@ -35,7 +45,7 @@ const noLoad = () => 0;
 
 describe("basic eligibility", () => {
   it("returns unassigned when navigator list is empty", () => {
-    const outcome = assignNavigator({ needCategory: "housing" }, [], noLoad);
+    const outcome = assignNavigator({ needCategory: "accommodations" }, [], noLoad);
     expect(outcome.assigned).toBe(false);
   });
 
@@ -66,10 +76,10 @@ describe("basic eligibility", () => {
 describe("need_category routing", () => {
   it("assigns to a navigator whose expertiseTags includes the needCategory (primary tier)", () => {
     const navs = [
-      makeNav({ id: "n1", expertiseTags: ["employment"], status: "available" }),
-      makeNav({ id: "n2", expertiseTags: ["housing"],    status: "available" }),
+      makeNav({ id: "n1", expertiseTags: ["Work"],           status: "available" }),
+      makeNav({ id: "n2", expertiseTags: ["Accommodations"], status: "available" }),
     ];
-    const outcome = assignNavigator({ needCategory: "housing" }, navs, noLoad);
+    const outcome = assignNavigator({ needCategory: "accommodations" }, navs, noLoad);
     expect(outcome.assigned).toBe(true);
     if (outcome.assigned) {
       expect(outcome.navigator.id).toBe("n2");
@@ -79,9 +89,9 @@ describe("need_category routing", () => {
 
   it("falls back to any available navigator when no specialist handles the category", () => {
     const navs = [
-      makeNav({ id: "n1", expertiseTags: ["employment"], status: "available" }),
+      makeNav({ id: "n1", expertiseTags: ["Work"], status: "available" }),
     ];
-    const outcome = assignNavigator({ needCategory: "housing" }, navs, noLoad);
+    const outcome = assignNavigator({ needCategory: "accommodations" }, navs, noLoad);
     expect(outcome.assigned).toBe(true);
     if (outcome.assigned) {
       expect(outcome.navigator.id).toBe("n1");
@@ -91,10 +101,10 @@ describe("need_category routing", () => {
 
   it("prefers a specialist over a generalist when both are available", () => {
     const navs = [
-      makeNav({ id: "n1", expertiseTags: ["employment"], status: "available" }),
-      makeNav({ id: "n2", expertiseTags: ["housing"],    status: "available" }),
+      makeNav({ id: "n1", expertiseTags: ["Work"],           status: "available" }),
+      makeNav({ id: "n2", expertiseTags: ["Accommodations"], status: "available" }),
     ];
-    const outcome = assignNavigator({ needCategory: "housing" }, navs, noLoad);
+    const outcome = assignNavigator({ needCategory: "accommodations" }, navs, noLoad);
     expect(outcome.assigned).toBe(true);
     if (outcome.assigned) expect(outcome.navigator.id).toBe("n2");
   });
@@ -107,7 +117,7 @@ describe("need_category routing", () => {
   });
 
   it("queues when no navigators are available at all (not a category failure)", () => {
-    const outcome = assignNavigator({ needCategory: "housing" }, [], noLoad);
+    const outcome = assignNavigator({ needCategory: "accommodations" }, [], noLoad);
     expect(outcome.assigned).toBe(false);
   });
 });
@@ -136,9 +146,9 @@ describe("language routing", () => {
   });
 
   it("hard-rejects on language even in fallback (category unmatched + language unmatched)", () => {
-    const navs = [makeNav({ id: "n1", languages: ["en"], expertiseTags: ["employment"], status: "available" })];
-    // Housing specialist unavailable → fallback → but no one speaks "es" → queue
-    const outcome = assignNavigator({ needCategory: "housing", language: "es" }, navs, noLoad);
+    const navs = [makeNav({ id: "n1", languages: ["en"], expertiseTags: ["Work"], status: "available" })];
+    // Accommodations specialist unavailable → fallback → but no one speaks "es" → queue
+    const outcome = assignNavigator({ needCategory: "accommodations", language: "es" }, navs, noLoad);
     expect(outcome.assigned).toBe(false);
     if (!outcome.assigned) expect(outcome.reason).toContain('"es"');
   });
@@ -178,11 +188,11 @@ describe("language routing", () => {
 describe("tiered routing", () => {
   it("PRIMARY: routes to specialist with category + language match", () => {
     const navs = [
-      makeNav({ id: "n1", expertiseTags: ["housing"],    languages: ["en"],       status: "available" }),
-      makeNav({ id: "n2", expertiseTags: ["employment"], languages: ["en", "es"], status: "available" }),
+      makeNav({ id: "n1", expertiseTags: ["Accommodations"], languages: ["en"],       status: "available" }),
+      makeNav({ id: "n2", expertiseTags: ["Work"],           languages: ["en", "es"], status: "available" }),
     ];
-    // Only n1 has housing; n1 speaks "en"; n2 is a non-specialist that speaks "es"
-    const outcome = assignNavigator({ needCategory: "housing", language: "en" }, navs, noLoad);
+    // Only n1 has accommodations; n1 speaks "en"; n2 is a non-specialist that speaks "es"
+    const outcome = assignNavigator({ needCategory: "accommodations", language: "en" }, navs, noLoad);
     expect(outcome.assigned).toBe(true);
     if (outcome.assigned) {
       expect(outcome.navigator.id).toBe("n1");
@@ -193,10 +203,10 @@ describe("tiered routing", () => {
 
   it("FALLBACK: routes to any navigator with language match when no specialist is available", () => {
     const navs = [
-      makeNav({ id: "n1", expertiseTags: ["employment"], languages: ["en", "es"], status: "available" }),
+      makeNav({ id: "n1", expertiseTags: ["Work"], languages: ["en", "es"], status: "available" }),
     ];
-    // No housing specialist; n1 speaks "es" → fallback to n1
-    const outcome = assignNavigator({ needCategory: "housing", language: "es" }, navs, noLoad);
+    // No accommodations specialist; n1 speaks "es" → fallback to n1
+    const outcome = assignNavigator({ needCategory: "accommodations", language: "es" }, navs, noLoad);
     expect(outcome.assigned).toBe(true);
     if (outcome.assigned) {
       expect(outcome.navigator.id).toBe("n1");
@@ -207,12 +217,12 @@ describe("tiered routing", () => {
 
   it("FALLBACK: picks lowest-load navigator in fallback tier", () => {
     const navs = [
-      makeNav({ id: "n1", expertiseTags: ["employment"], languages: ["es"], capacity: 4, status: "available" }),
-      makeNav({ id: "n2", expertiseTags: ["employment"], languages: ["es"], capacity: 4, status: "available" }),
+      makeNav({ id: "n1", expertiseTags: ["Work"], languages: ["es"], capacity: 4, status: "available" }),
+      makeNav({ id: "n2", expertiseTags: ["Work"], languages: ["es"], capacity: 4, status: "available" }),
     ];
     // n1 has 2 active sessions (ratio 0.5); n2 is idle → n2 wins in fallback
     const outcome = assignNavigator(
-      { needCategory: "housing", language: "es" },
+      { needCategory: "accommodations", language: "es" },
       navs,
       (id) => (id === "n1" ? 2 : 0),
     );
@@ -222,22 +232,22 @@ describe("tiered routing", () => {
 
   it("FALLBACK: queues when language unmatched even after dropping category", () => {
     const navs = [
-      makeNav({ id: "n1", expertiseTags: ["employment"], languages: ["en"], status: "available" }),
+      makeNav({ id: "n1", expertiseTags: ["Work"], languages: ["en"], status: "available" }),
     ];
-    // No housing specialist, and no one speaks "zh" → queue
-    const outcome = assignNavigator({ needCategory: "housing", language: "zh" }, navs, noLoad);
+    // No accommodations specialist, and no one speaks "zh" → queue
+    const outcome = assignNavigator({ needCategory: "accommodations", language: "zh" }, navs, noLoad);
     expect(outcome.assigned).toBe(false);
     if (!outcome.assigned) expect(outcome.reason).toContain('"zh"');
   });
 
   it("specialist at full capacity falls through to non-specialist fallback", () => {
     const navs = [
-      makeNav({ id: "n1", expertiseTags: ["housing"],    capacity: 2, status: "available" }),
-      makeNav({ id: "n2", expertiseTags: ["employment"], capacity: 2, status: "available" }),
+      makeNav({ id: "n1", expertiseTags: ["Accommodations"], capacity: 2, status: "available" }),
+      makeNav({ id: "n2", expertiseTags: ["Work"],           capacity: 2, status: "available" }),
     ];
-    // n1 (housing specialist) is full; n2 (employment) has capacity → fallback to n2
+    // n1 (accommodations specialist) is full; n2 (work) has capacity → fallback to n2
     const outcome = assignNavigator(
-      { needCategory: "housing" },
+      { needCategory: "accommodations" },
       navs,
       (id) => (id === "n1" ? 2 : 0),
     );
@@ -365,14 +375,14 @@ describe("isWithinSchedule", () => {
     },
   });
 
-  it("returns true when no schedule is set (undefined)", () => {
+  it("returns false when no schedule is set (incomplete profile — not matchable)", () => {
     const nav = makeNav({ availabilitySchedule: undefined });
-    expect(isWithinSchedule(nav, mon10am)).toBe(true);
+    expect(isWithinSchedule(nav, mon10am)).toBe(false);
   });
 
-  it("returns true when schedule is an empty object", () => {
+  it("returns false when schedule is an empty object (incomplete profile — not matchable)", () => {
     const nav = makeNav({ availabilitySchedule: {} });
-    expect(isWithinSchedule(nav, mon10am)).toBe(true);
+    expect(isWithinSchedule(nav, mon10am)).toBe(false);
   });
 
   it("returns true when now is within the day's window", () => {
@@ -436,14 +446,15 @@ describe("availability schedule — assignNavigator integration", () => {
     expect(outcome.assigned).toBe(false);
   });
 
-  it("routes to unscheduled navigator when scheduled one is outside window", () => {
-    const scheduled = makeNav({
+  it("routes to wide-schedule navigator when narrow-schedule one is outside window", () => {
+    const narrow = makeNav({
       id: "n1",
       status: "available",
       availabilitySchedule: { Mon: { start: "09:00", end: "17:00" } },
     });
-    const unscheduled = makeNav({ id: "n2", status: "available" }); // no schedule = always eligible
-    const outcome = assignNavigator({ needCategory: "other" }, [scheduled, unscheduled], noLoad, "initial", mon8am);
+    // n2 uses the makeNav default: full-week 00:00-24:00, so eligible at mon8am
+    const wide = makeNav({ id: "n2", status: "available" });
+    const outcome = assignNavigator({ needCategory: "other" }, [narrow, wide], noLoad, "initial", mon8am);
     expect(outcome.assigned).toBe(true);
     if (outcome.assigned) expect(outcome.navigator.id).toBe("n2");
   });
@@ -455,8 +466,8 @@ describe("availability schedule — assignNavigator integration", () => {
       capacity: 10,
       availabilitySchedule: { Tue: { start: "09:00", end: "17:00" } }, // Mon not included
     });
-    const highLoad = makeNav({ id: "n2", status: "available", capacity: 4 });
-    const lowLoad  = makeNav({ id: "n3", status: "available", capacity: 4 });
+    const highLoad = makeNav({ id: "n2", status: "available", capacity: 4 }); // default full-week schedule
+    const lowLoad  = makeNav({ id: "n3", status: "available", capacity: 4 }); // default full-week schedule
     // n2 has load ratio 0.5, n3 is idle → n3 wins; n1 is excluded by schedule
     const outcome = assignNavigator(
       { needCategory: "other" },
