@@ -640,19 +640,16 @@ async function deleteSession(sessionId, jwtPayload) {
     return respond(409, { error: "Only closed sessions can be deleted" });
   }
 
-  // Delete Matrix room first. If this fails the DB record is left intact,
-  // keeping DB and Matrix consistent (both present or both gone).
-  try {
-    await invokeMatrix({ operation: "deleteRoom", roomId: session.matrix_room_id });
-  } catch (err) {
-    console.error(`[deleteSession] Matrix room deletion failed for room ${session.matrix_room_id}:`, err);
-    return respond(500, {
-      error: "Failed to delete Matrix room. Session record has been preserved.",
-    });
+  // Best-effort Matrix room deletion — log failures but don't block the DB delete.
+  if (session.matrix_room_id) {
+    try {
+      await invokeMatrix({ operation: "deleteRoom", roomId: session.matrix_room_id });
+    } catch (err) {
+      console.error(`[deleteSession] Matrix room deletion failed for room ${session.matrix_room_id}:`, err);
+    }
   }
 
-  // Matrix room is gone — now permanently remove the DB record.
-  // session_events rows cascade-delete via the FK constraint.
+  await pool.query("DELETE FROM session_events WHERE session_id=$1", [sessionId]);
   await pool.query("DELETE FROM sessions WHERE id=$1", [sessionId]);
 
   return respond(200, { ok: true, deletedSessionId: sessionId });

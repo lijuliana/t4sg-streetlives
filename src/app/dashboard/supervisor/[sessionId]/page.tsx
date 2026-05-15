@@ -47,8 +47,8 @@ interface Session {
 interface NavProfile {
   id: string;
   auth0_user_id: string;
-  first_name: string | null;
-  last_name: string | null;
+  first_name: string;
+  last_name: string;
   nav_group: string;
   status: string;
 }

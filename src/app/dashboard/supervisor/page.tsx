@@ -301,8 +301,8 @@ export default async function SupervisorDashboardPage() {
     .sort(byClosed);
 
   const active = allSessions.filter((s) => s.status !== "closed");
-  const transferRequested = active.filter((s) => isTransferRequested(s.id)).sort(byRecent);
-  const unassigned = allSessions.filter((s) => s.navigator_id === null && s.status !== "closed").sort(byRecent);
+  const transferRequested = active.filter((s) => isTransferRequested(s.id)).sort(byCreated);
+  const unassigned = allSessions.filter((s) => s.navigator_id === null && s.status !== "closed").sort(byCreated);
   const approvedArchive = allSessions
     .filter((s) => s.approved === true)
     .sort(byClosed);
