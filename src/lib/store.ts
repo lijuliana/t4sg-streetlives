@@ -48,6 +48,7 @@ export interface NavigatorProfile {
   languages: string[];
   expertise_tags?: string[] | null;
   availability_schedule?: Record<string, { start: string; end: string }> | null;
+  timezone?: string | null;
   is_general_intake?: boolean;
 }
 

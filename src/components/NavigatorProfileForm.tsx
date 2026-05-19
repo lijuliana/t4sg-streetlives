@@ -28,6 +28,7 @@ interface FormValues {
   nav_group: string;
   custom_nav_group: string;
   capacity: number;
+  timezone: string;
 }
 
 interface Props {
@@ -71,6 +72,7 @@ export default function NavigatorProfileForm({ initialProfile, auth0UserId }: Pr
       nav_group: isKnownGroup ? savedGroup : (savedGroup ? "__other__" : ""),
       custom_nav_group: isKnownGroup ? "" : savedGroup,
       capacity: initialProfile?.capacity ?? 5,
+      timezone: initialProfile?.timezone ?? "America/New_York",
     },
   });
 
@@ -145,6 +147,7 @@ export default function NavigatorProfileForm({ initialProfile, auth0UserId }: Pr
       expertise_tags: specialties,
       capacity: data.capacity,
       status: "available",
+      timezone: data.timezone,
       availability_schedule: availabilitySchedule,
     };
 
@@ -370,6 +373,21 @@ export default function NavigatorProfileForm({ initialProfile, auth0UserId }: Pr
           Availability{" "}
           <span className="text-gray-400 font-normal">(select days and set hours)</span>
         </label>
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Time zone</label>
+          <select
+            {...register("timezone")}
+            className="w-full text-sm border border-gray-200 rounded-md px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-yellow bg-white"
+          >
+            <option value="America/New_York">Eastern (ET)</option>
+            <option value="America/Chicago">Central (CT)</option>
+            <option value="America/Denver">Mountain (MT)</option>
+            <option value="America/Los_Angeles">Pacific (PT)</option>
+            <option value="America/Anchorage">Alaska (AKT)</option>
+            <option value="Pacific/Honolulu">Hawaii (HT)</option>
+            <option value="UTC">UTC</option>
+          </select>
+        </div>
         <div className="flex flex-wrap gap-2 mb-3">
           {DAYS_OF_WEEK.map((day) => (
             <button

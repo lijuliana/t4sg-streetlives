@@ -39,7 +39,7 @@ export interface LambdaNavigator {
   languages: string[];
   expertise_tags: string[];
   availability_schedule: Record<string, { start: string; end: string }> | null | undefined;
-  // Optional display fields returned by Lambda but not used in routing logic
+  timezone?: string | null;
   first_name?: string | null;
   last_name?: string | null;
   nav_group?: string | null;
@@ -72,17 +72,22 @@ function languageMatches(navLanguages: string[], requestedIso: string): boolean 
 export function isWithinSchedule(
   schedule: Record<string, { start: string; end: string }> | null | undefined,
   now: Date,
+  timezone?: string | null,
 ): boolean {
-  // No schedule set = incomplete profile = not available for routing
   if (!schedule || Object.keys(schedule).length === 0) return false;
-  const dayKey = DAY_ABBREVIATIONS[now.getDay()];
+  const tz = timezone || "America/New_York";
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  const dayKey = get("weekday") as typeof DAY_ABBREVIATIONS[number];
   const hours = schedule[dayKey];
   if (!hours) return false;
   const toMinutes = (hhmm: string) => {
     const [h, m] = hhmm.split(":").map(Number);
     return (h ?? 0) * 60 + (m ?? 0);
   };
-  const current = now.getHours() * 60 + now.getMinutes();
+  const current = Number(get("hour")) * 60 + Number(get("minute"));
   return current >= toMinutes(hours.start) && current < toMinutes(hours.end);
 }
 
@@ -95,7 +100,7 @@ export function pickNavigator(
   const eligible = navigators.filter((n) => {
     if (n.status !== "available" || (n.capacity ?? 0) <= 0) return false;
     if (!n.expertise_tags?.length || !n.languages?.length) return false;
-    if (!isWithinSchedule(n.availability_schedule, now)) return false;
+    if (!isWithinSchedule(n.availability_schedule, now, n.timezone)) return false;
     // When load data is unavailable (null), skip the load-vs-capacity check rather
     // than treating every navigator as load=0 (which falsely passes over-capacity navigators).
     if (activeLoadMap !== null) {

@@ -279,6 +279,17 @@ async function createSession(event) {
   });
 }
 
+async function getSessionLoad() {
+  const result = await pool.query(
+    `SELECT navigator_id, COUNT(*) as count FROM sessions
+     WHERE status = 'active' AND navigator_id IS NOT NULL
+     GROUP BY navigator_id`
+  );
+  const load = {};
+  for (const row of result.rows) load[row.navigator_id] = parseInt(row.count);
+  return respond(200, { load });
+}
+
 // GET /sessions — supervisor sees all; navigator sees only their own sessions
 async function listSessions(jwtPayload) {
   const roles = jwtPayload["https://streetlives.app/roles"] ?? [];
@@ -559,8 +570,8 @@ async function createNavigator(body) {
   const tags = expertise_tags ?? specialties ?? [];
   const result = await pool.query(
     `INSERT INTO navigator_profiles
-       (auth0_user_id, nav_group, expertise_tags, languages, capacity, status, is_general_intake)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+       (auth0_user_id, nav_group, expertise_tags, languages, capacity, status, is_general_intake, timezone)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
     [
       auth0_user_id,
       nav_group,
@@ -569,6 +580,7 @@ async function createNavigator(body) {
       capacity,
       status ?? "offline",
       is_general_intake ?? false,
+      body.timezone ?? "America/New_York",
     ]
   );
   return respond(201, result.rows[0]);
@@ -588,7 +600,7 @@ async function updateNavigator(id, body) {
     b.expertise_tags = b.specialties;
     delete b.specialties;
   }
-  const fields = ["nav_group","expertise_tags","languages","capacity","status","is_general_intake","first_name","last_name"];
+  const fields = ["nav_group","expertise_tags","languages","capacity","status","is_general_intake","first_name","last_name","timezone"];
   const updates = [];
   const values = [];
   let i = 1;
@@ -621,7 +633,8 @@ async function getNavigatorMe(auth0Sub) {
   );
   if (result.rows.length === 0) return respond(404, { error: "Profile not found" });
   return respond(200, result.rows[0]);
-  
+}
+
 // DELETE /sessions/:id — supervisor only, closed sessions only
 async function deleteSession(sessionId, jwtPayload) {
   const roles = jwtPayload["https://streetlives.app/roles"] ?? [];
@@ -722,6 +735,11 @@ export const handler = async (event) => {
       return respond(401, { error: "Unauthorized: " + err.message });
     }
     const actorSub = jwtPayload.sub?.endsWith("@clients") ? "user" : jwtPayload.sub;
+
+    // GET /sessions/load  (no role required, any valid JWT)
+    if (method === "GET" && segments[0] === "sessions" && segments[1] === "load") {
+      return await getSessionLoad();
+    }
 
     // GET /sessions  (list all)
     if (method === "GET" && segments[0] === "sessions" && segments.length === 1) {
