@@ -69,61 +69,29 @@ export async function POST(req: Request) {
     return NextResponse.json(data, { status: res.status });
   }
 
-  // Fetch navigators and active sessions in parallel for routing
-  const [navsRes, sessionsRes] = await Promise.all([
+  // Fetch navigators and active load counts in parallel for routing
+  const [navsRes, loadRes] = await Promise.all([
     lambdaM2M(m2mToken, "/navigators"),
-    lambdaM2M(m2mToken, "/sessions"),
+    lambdaM2M(m2mToken, "/sessions/load"),
   ]);
 
   const navsBody = navsRes.ok ? await navsRes.json().catch(() => []) : [];
   const navList: LambdaNavigator[] = Array.isArray(navsBody) ? navsBody : (navsBody.navigators ?? []);
 
-  console.log(`[session:create] sessions fetch: status=${sessionsRes.status}`);
-
-  // null = load data unavailable (e.g. 403); {} = available but empty.
-  // Keeping these distinct prevents treating every navigator as load=0 when we
-  // simply don't have data, which would let over-capacity navigators pass routing.
+  // null means load data unavailable; {} means available but no active sessions.
+  // Keeping these distinct prevents treating every navigator as load=0 when data is missing.
   let loadMap: Record<string, number> | null = null;
 
-  if (sessionsRes.status === 403) {
-    console.warn(
-      "[session:create] sessions fetch returned 403 — M2M client lacks read-sessions permission. " +
-      "Load balancing is DISABLED for this request. Fix: grant the M2M application the " +
-      "sessions:read scope (or equivalent) in the Auth0 API settings for the Lambda audience.",
-    );
-  } else if (sessionsRes.ok) {
-    const sessionsBody = await sessionsRes.json().catch(() => null);
-
-    if (sessionsBody !== null && !Array.isArray(sessionsBody)) {
-      console.log(`[session:create] sessions response keys: ${Object.keys(sessionsBody as object).join(", ")}`);
-    }
-
-    // Normalise to a flat array — handle bare array, { sessions }, { items }, { data }.
-    const rawSessions: Array<Record<string, unknown>> =
-      sessionsBody === null ? [] :
-      Array.isArray(sessionsBody) ? (sessionsBody as Array<Record<string, unknown>>) :
-      (((sessionsBody as Record<string, unknown>).sessions ??
-        (sessionsBody as Record<string, unknown>).items ??
-        (sessionsBody as Record<string, unknown>).data ??
-        []) as Array<Record<string, unknown>>);
-
-    // Active load per navigator (non-closed sessions).
-    // Try multiple field names — navigator_id (Lambda snake_case), assignedNavigatorId
-    // (Express camelCase), or assigned_navigator_id.
-    loadMap = {};
-    for (const s of rawSessions) {
-      const navId = (s.navigator_id ?? s.assignedNavigatorId ?? s.assigned_navigator_id) as string | null | undefined;
-      const status = s.status as string | null | undefined;
-      if (navId && status !== "closed") {
-        loadMap[navId] = (loadMap[navId] ?? 0) + 1;
-      }
-    }
-
+  if (loadRes.status === 403) {
+    console.warn("[session:create] /sessions/load returned 403 — load balancing disabled");
+  } else if (loadRes.ok) {
+    const loadBody = await loadRes.json().catch(() => null);
+    loadMap = (loadBody?.load ?? {}) as Record<string, number>;
     console.log(
-      `[session:create] routing pool: ${navList.length} navigators, ${rawSessions.length} sessions loadMap=${JSON.stringify(loadMap)}`,
+      `[session:create] routing pool: ${navList.length} navigators, loadMap=${JSON.stringify(loadMap)}`,
     );
   } else {
-    console.warn(`[session:create] sessions fetch failed: status=${sessionsRes.status} — load balancing disabled`);
+    console.warn(`[session:create] /sessions/load failed: status=${loadRes.status} — load balancing disabled`);
   }
 
   if (loadMap === null) {
@@ -137,7 +105,7 @@ export async function POST(req: Request) {
     const reasons: string[] = [];
     if (n.status !== "available") reasons.push(`status=${n.status}`);
     if ((n.capacity ?? 0) <= 0) reasons.push(`capacity=${n.capacity}`);
-    if (!isWithinSchedule(n.availability_schedule, now)) reasons.push("outside-schedule");
+    if (!isWithinSchedule(n.availability_schedule, now, n.timezone)) reasons.push("outside-schedule");
     if (load !== null && (n.capacity ?? 0) > 0 && load >= (n.capacity ?? 0)) reasons.push(`overload=${load}/${n.capacity}`);
     console.log(
       `[session:create]   nav=${n.id.slice(0, 8)} status=${n.status} cap=${n.capacity} load=${load} ` +
